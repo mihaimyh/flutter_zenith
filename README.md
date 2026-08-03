@@ -10,11 +10,20 @@ A high-performance, container-scoped state management and dependency injection e
 
 ## 🌟 Key Features
 
+* **Type-Safe DI Keys:** `ZenithKey<T>` gives compile-time-safe dependency lookup, replacing string-only key workflows when desired.
+* **Scoped Overrides:** `ZenithOverride<T>` lets tests and local scopes swap implementations without changing production factories.
 * **Surgical Rendering:** Widgets subscribe directly to atomic property nodes (`ZenithNode<T>`). Mutating a node re-renders *only* the listening `ZenithBuilder`—parent and sibling widgets remain completely idle.
 * **Scoped Memory Isolation:** State resides inside a `ZenithContainer` bound to the widget tree via `ZenithScope`. Swapping or unmounting a scope automatically purges all contained state from memory.
 * **Weak Reference Memory Safety:** Node subscriptions use `WeakReference` and automatic subscriber pruning to prevent memory leaks, even if a listener fails to unsubscribe.
 * **Async Lifecycle Guards:** Built-in `AsyncValue<T>` state machines (`AsyncData`, `AsyncLoading`, `AsyncError`) paired with `ref.isMounted` execution tokens eliminate asynchronous post-disposal crashes.
 * **Zero Dependencies:** Pure Dart/Flutter framework implementation—no `build_runner`, code generation, or third-party packages required.
+
+### What Is New in 0.2.0
+
+* Added `ZenithKey<T>` and typed container helpers: `getOrCreate`, `maybeReadKey`, `invalidateKey`.
+* Added scoped overrides with `ZenithOverride<T>`.
+* Added `BuildContext` helpers: `context.container` and `context.zenith(...)`.
+* Existing string-key API remains supported for backwards compatibility.
 
 ---
 
@@ -119,11 +128,14 @@ Use `ZenithBuilder` to read nodes. The builder automatically registers as a list
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
+  static const counterControllerKey = ZenithKey<CounterController>(
+    'counterController',
+  );
+
   @override
   Widget build(BuildContext context) {
-    final container = ZenithScope.of(context);
-    final controller = container.getOrCreateNode(
-      'counterController', 
+    final controller = context.zenith(
+      counterControllerKey,
       (ref) => CounterController(),
     ).value;
 
@@ -162,6 +174,21 @@ class HomeScreen extends StatelessWidget {
   }
 }
 
+```
+
+### Optional Scoped Overrides (Testing / Feature Scopes)
+
+```dart
+const counterKey = ZenithKey<CounterController>('counterController');
+
+final container = ZenithContainer(
+  overrides: [
+    ZenithOverride<CounterController>(
+      counterKey,
+      (ref) => CounterController(),
+    ),
+  ],
+);
 ```
 
 ---

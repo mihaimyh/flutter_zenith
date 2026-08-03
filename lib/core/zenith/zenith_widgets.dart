@@ -1,6 +1,7 @@
 import 'package:flutter/widgets.dart';
 
 import 'zenith_container.dart';
+import 'zenith_key.dart';
 import 'zenith_node.dart';
 
 class ZenithScope extends StatefulWidget {
@@ -131,5 +132,20 @@ class _ZenithBuilderState extends State<ZenithBuilder>
     _observedNodes.clear();
     _nodesReadThisBuild.clear();
     super.dispose();
+  }
+}
+
+/// Ergonomic helpers so widgets can access the current [ZenithContainer]
+/// directly from a [BuildContext] without a verbose [ZenithScope.of] call.
+extension ZenithContextX on BuildContext {
+  /// Resolves the current [ZenithContainer] from the nearest [ZenithScope].
+  ZenithContainer get container => ZenithScope.of(this);
+
+  /// Type-safe helper to read or create a node using a [ZenithKey].
+  ZenithNode<T> zenith<T>(
+    ZenithKey<T> key,
+    T Function(ZenithRef ref) factory,
+  ) {
+    return ZenithScope.of(this).getOrCreate<T>(key, factory);
   }
 }

@@ -1,3 +1,18 @@
+## 0.2.0
+
+* Added type-safe dependency keys with `ZenithKey<T>`.
+* Added scoped factory overrides via `ZenithOverride<T>` and
+  `ZenithContainer(overrides: [...])`.
+* Added typed container APIs:
+  `getOrCreate<T>(ZenithKey<T>, factory)`,
+  `maybeReadKey<T>(ZenithKey<T>)`, and
+  `invalidateKey<T>(ZenithKey<T>)`.
+* Added `BuildContext` ergonomics via `ZenithContextX`:
+  `context.container` and `context.zenith(...)`.
+* Preserved backwards compatibility for existing string-key APIs
+  (`getOrCreateNode`, `maybeNode`, `invalidate`).
+* Added tests for key equality, typed node caching, and override behavior.
+
 ## 0.1.0
 
 * Initial release of `flutter_zenith`.

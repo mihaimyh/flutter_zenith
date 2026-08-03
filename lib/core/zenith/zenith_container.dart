@@ -1,6 +1,7 @@
+import 'zenith_key.dart';
 import 'zenith_node.dart';
 
-typedef NodeKey = String;
+typedef NodeKey = Object;
 
 class ZenithRef {
   final ZenithContainer container;
@@ -41,9 +42,15 @@ class ZenithContainer {
   final Map<NodeKey, ZenithNode<dynamic>> _nodes =
       <NodeKey, ZenithNode<dynamic>>{};
   final Map<NodeKey, ZenithRef> _refs = <NodeKey, ZenithRef>{};
+  final Map<ZenithKey<dynamic>, Function> _overrides;
   bool _isDisposed = false;
 
-  ZenithContainer({this.parent});
+  ZenithContainer({
+    this.parent,
+    List<ZenithOverride<dynamic>> overrides = const [],
+  }) : _overrides = {
+         for (final override in overrides) override.key: override.factory,
+       };
 
   bool get isDisposed => _isDisposed;
 
@@ -69,6 +76,37 @@ class ZenithContainer {
     return node;
   }
 
+  /// Type-safe node retrieval or creation using a [ZenithKey].
+  ///
+  /// If a [ZenithOverride] was registered for [key] on this container, its
+  /// factory is used instead of [factory]. Nodes created this way live in
+  /// the same internal storage as [getOrCreateNode], so [invalidate] and
+  /// [invalidateKey] both operate on them consistently.
+  ZenithNode<T> getOrCreate<T>(
+    ZenithKey<T> key,
+    T Function(ZenithRef ref) factory,
+  ) {
+    if (_isDisposed) {
+      throw StateError('Cannot create node in disposed ZenithContainer');
+    }
+
+    final existing = _nodes[key];
+    if (existing != null) {
+      return existing as ZenithNode<T>;
+    }
+
+    final overrideFactory = _overrides[key] as T Function(ZenithRef ref)?;
+    final effectiveFactory = overrideFactory ?? factory;
+
+    final ref = ZenithRef(this);
+    _refs[key] = ref;
+
+    final initialValue = effectiveFactory(ref);
+    final node = ZenithNode<T>(initialValue);
+    _nodes[key] = node;
+    return node;
+  }
+
   ZenithNode<T>? maybeNode<T>(NodeKey key) {
     final local = _nodes[key];
     if (local != null) {
@@ -76,6 +114,16 @@ class ZenithContainer {
     }
 
     return null;
+  }
+
+  /// Type-safe optional node lookup that also checks parent containers.
+  ZenithNode<T>? maybeReadKey<T>(ZenithKey<T> key) {
+    final local = _nodes[key];
+    if (local != null) {
+      return local as ZenithNode<T>;
+    }
+
+    return parent?.maybeReadKey<T>(key);
   }
 
   void invalidate(NodeKey key) {
@@ -90,6 +138,11 @@ class ZenithContainer {
     }
 
     parent?.invalidate(key);
+  }
+
+  /// Type-safe convenience wrapper around [invalidate] for a [ZenithKey].
+  void invalidateKey<T>(ZenithKey<T> key) {
+    invalidate(key);
   }
 
   void dispose() {
