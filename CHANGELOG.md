@@ -1,3 +1,20 @@
+## 0.4.0
+
+* Added `ConcurrencyStrategy` (`concurrent`, `droppable`, `restartable`) and
+  `ZenithConcurrencyX.runAsyncGuarded<T>(node, task, {strategy})`: a
+  race-condition-safe alternative to `ref.runAsync` for `AsyncValue<T>`
+  nodes. `droppable` ignores new calls while a task is already loading
+  (prevents double-submit on rapid taps); `restartable` (the default)
+  drops stale results/errors from superseded calls so only the latest
+  invocation can ever update state (fixes stale-response bugs in
+  search-as-you-type / rapid tab switching).
+* Added `ZenithIsolateX.runInIsolate<T, P>(node, payload, heavyComputation,
+  {strategy})`: offloads a heavy synchronous computation to a background
+  `Isolate` via `Isolate.run`, then writes the result through
+  `runAsyncGuarded`, keeping the UI thread free of jank.
+* Both extensions are additive -- `ZenithRef.runAsync` and
+  `SafeAsyncNodeX.guard` are unchanged.
+
 ## 0.3.0
 
 * Added `ZenithRef.set<T>(node, value)`: a mounted-safe write helper that

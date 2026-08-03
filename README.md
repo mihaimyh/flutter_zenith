@@ -16,9 +16,21 @@ A high-performance, container-scoped state management and dependency injection e
 * **Scoped Memory Isolation:** State resides inside a `ZenithContainer` bound to the widget tree via `ZenithScope`. Swapping or unmounting a scope automatically purges all contained state from memory.
 * **Weak Reference Memory Safety:** Node subscriptions use `WeakReference` and automatic subscriber pruning to prevent memory leaks, even if a listener fails to unsubscribe.
 * **Async Lifecycle Guards:** Built-in `AsyncValue<T>` state machines (`AsyncData`, `AsyncLoading`, `AsyncError`) paired with automatic mounted-checks via `ref.set()` / `ref.runAsync()` eliminate asynchronous post-disposal crashes without manual `ref.isMounted` checks.
+* **Concurrency & Isolate Guards:** `ref.runAsyncGuarded(node, task, strategy: ...)` solves race conditions between overlapping async calls (`droppable` for double-submit prevention, `restartable` for stale-response prevention), and `ref.runInIsolate(node, payload, heavyComputation)` offloads heavy synchronous work to a background `Isolate` without leaving the `AsyncValue` state machine.
 * **Zero Dependencies:** Pure Dart/Flutter framework implementation—no `build_runner`, code generation, or third-party packages required.
 
-### What Is New in 0.3.0
+### What Is New in 0.4.0
+
+* Added `ConcurrencyStrategy` (`concurrent`, `droppable`, `restartable`) and
+  `ZenithConcurrencyX.runAsyncGuarded(node, task, {strategy})`: guards
+  `AsyncValue<T>` nodes against race conditions from overlapping async
+  calls -- `droppable` ignores new calls while one is already loading;
+  `restartable` (the default) discards stale results from superseded calls.
+* Added `ZenithIsolateX.runInIsolate(node, payload, heavyComputation,
+  {strategy})`: runs a heavy computation on a background `Isolate` via
+  `Isolate.run`, then writes the result through `runAsyncGuarded`.
+
+### What Was New in 0.3.0
 
 * Added `ZenithRef.set(node, value)` and `ZenithRef.runAsync(node, task)`: mounted-safe writes that silently no-op once the ref's scope is disposed, so you no longer need to manually check `ref.isMounted` after every `await`.
 * Added the `SafeAsyncNodeX.guard(ref, future)` extension on `ZenithNode<AsyncValue<T>>` as sugar over `ref.runAsync(...)`.
@@ -89,6 +101,54 @@ Prefer a more explicit call site? Use `ref.set()` for one-off mounted-safe write
 Future<void> fetchUserManually(ZenithRef ref) async {
   final name = await api.fetchUser();
   ref.set(userProfileNode, AsyncData(name)); // Silently ignored if disposed.
+}
+
+```
+
+#### Race Conditions & Double-Submits: `ref.runAsyncGuarded()`
+
+When an async call can be triggered again before it finishes (rapid search
+typing, a "Pay" button tapped twice), use `runAsyncGuarded` instead of
+`runAsync`:
+
+```dart
+// Search-as-you-type: only the LATEST query is ever allowed to update state.
+void onSearchQueryChanged(ZenithRef ref, String query) {
+  ref.runAsyncGuarded(
+    searchResultsNode,
+    () => api.search(query),
+    strategy: ConcurrencyStrategy.restartable, // default
+  );
+}
+
+// Submit button: ignore rapid re-taps while a request is already in flight.
+Future<void> submitPayment(ZenithRef ref) async {
+  await ref.runAsyncGuarded(
+    paymentStateNode,
+    () => api.processPayment(),
+    strategy: ConcurrencyStrategy.droppable,
+  );
+}
+
+```
+
+#### Heavy Computation Off the UI Thread: `ref.runInIsolate()`
+
+For CPU-heavy synchronous work (large JSON parsing, crypto), offload it to a
+background `Isolate` while keeping the same `AsyncValue` state machine:
+
+```dart
+Future<void> loadLargeDataset(ZenithRef ref, String rawJsonResponse) async {
+  await ref.runInIsolate(
+    datasetNode,
+    rawJsonResponse,
+    (json) {
+      // Runs on a background Isolate -- keep this pure and self-contained;
+      // do not close over ZenithRef, BuildContext, or other mutable state.
+      final list = jsonDecode(json) as List;
+      return list.map((item) => HeavyModel.fromJson(item)).toList();
+    },
+  );
 }
 
 ```
@@ -215,6 +275,8 @@ If you are an AI coding assistant (Cursor, Claude Code, Copilot, Devin, etc.) ge
 ### Rule 2: Memory & Async Safety
 
 * **Prefer `ref.runAsync()` / `ref.set()`:** ALL asynchronous operations (`Future`, `Stream`, or `Timer` callbacks) that write to a `ZenithNode` SHOULD use `ref.runAsync(node, task)` (for `AsyncValue<T>` nodes) or `ref.set(node, value)` (for plain nodes) instead of manually checking `ref.isMounted`. Both silently no-op once the ref's scope is disposed.
+* **Use `ref.runAsyncGuarded()` for rapid-fire triggers:** If a `ZenithNode<AsyncValue<T>>` can be re-triggered before the previous call finishes (search-as-you-type, fast tab switching, a submit button tapped repeatedly), use `ref.runAsyncGuarded(node, task, strategy: ...)` instead of bare `ref.runAsync()`. Use `ConcurrencyStrategy.restartable` (default) so only the latest call's result lands, or `ConcurrencyStrategy.droppable` to ignore new calls while one is already loading.
+* **Use `ref.runInIsolate()` for heavy synchronous work:** Large JSON parsing, crypto, or other CPU-bound transforms that would jank the UI thread SHOULD run via `ref.runInIsolate(node, payload, heavyComputation)`, not directly inside `runAsync`/`runAsyncGuarded`. Keep `heavyComputation` free of closures over `ZenithRef`, `BuildContext`, or other non-sendable state.
 * **Manual guard as fallback:** If a helper isn't a good fit, checking `if (!ref.isMounted) return;` before mutation is still valid and supported.
 * **Node Mutation Checks:** Do NOT attempt to read a disposed `ZenithNode` (`.value` throws `StateError`). Always ensure node disposal is handled through `ZenithContainer.dispose()` or `ref.onDispose()`. Note that `ZenithNode.set()` itself is a safe no-op on a disposed node (it does not throw), but `ref.runAsync()`/`ref.set()` remain the preferred, self-guarding entry points.
 
@@ -291,6 +353,7 @@ flutter_zenith/
 │   └── core/
 │       └── zenith/
 │           ├── async_value.dart       # AsyncValue state machine (Data, Loading, Error)
+│           ├── zenith_concurrency.dart # ConcurrencyStrategy, runAsyncGuarded, runInIsolate
 │           ├── zenith_node.dart        # Atomic reactive nodes with WeakRef tracking
 │           ├── zenith_container.dart   # Memory DI container, ref lifecycle, & scoping
 │           ├── zenith_widgets.dart     # ZenithScope & surgical ZenithBuilder
