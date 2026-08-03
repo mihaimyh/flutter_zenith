@@ -1,8 +1,3 @@
-Here is a comprehensive, production-grade `README.md` designed specifically to serve two distinct audiences: **human developers** who want clean, readable documentation and **AI coding agents** (Cursor, Claude Code, Copilot, Devin) that need explicit structural rules, architectural guidelines, and code patterns to use `flutter_zenith` correctly without hallucinating non-existent APIs.
-
----
-
-```markdown
 # flutter_zenith
 
 [![Flutter](https://img.shields.io/badge/Flutter-3.25%2B-02569B?logo=flutter)](https://flutter.dev)
@@ -301,7 +296,3 @@ flutter run
 ## 📜 License
 
 Distributed under the MIT License. See `LICENSE` for more information.
-
-```
-
-```
