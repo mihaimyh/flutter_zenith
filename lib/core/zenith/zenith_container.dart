@@ -75,7 +75,7 @@ class ZenithContainer {
       return local as ZenithNode<T>;
     }
 
-    return parent?.maybeNode<T>(key);
+    return null;
   }
 
   void invalidate(NodeKey key) {

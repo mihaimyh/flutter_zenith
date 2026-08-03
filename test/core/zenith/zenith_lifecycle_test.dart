@@ -73,6 +73,16 @@ void main() {
       },
     );
 
+    test('child containers do not fall back to parent nodes', () {
+      final parent = ZenithContainer();
+      parent.getOrCreateNode<int>('shared', (_) => 1);
+
+      final child = ZenithContainer(parent: parent);
+
+      expect(child.maybeNode<int>('shared'), isNull);
+      expect(child.maybeNode<int>('missing'), isNull);
+    });
+
     test('invalidation cycles are short-circuited by reentrancy guard', () {
       final nodeA = ZenithNode<int>(1);
       final nodeB = ZenithNode<int>(2);
