@@ -15,10 +15,16 @@ A high-performance, container-scoped state management and dependency injection e
 * **Surgical Rendering:** Widgets subscribe directly to atomic property nodes (`ZenithNode<T>`). Mutating a node re-renders *only* the listening `ZenithBuilder`—parent and sibling widgets remain completely idle.
 * **Scoped Memory Isolation:** State resides inside a `ZenithContainer` bound to the widget tree via `ZenithScope`. Swapping or unmounting a scope automatically purges all contained state from memory.
 * **Weak Reference Memory Safety:** Node subscriptions use `WeakReference` and automatic subscriber pruning to prevent memory leaks, even if a listener fails to unsubscribe.
-* **Async Lifecycle Guards:** Built-in `AsyncValue<T>` state machines (`AsyncData`, `AsyncLoading`, `AsyncError`) paired with `ref.isMounted` execution tokens eliminate asynchronous post-disposal crashes.
+* **Async Lifecycle Guards:** Built-in `AsyncValue<T>` state machines (`AsyncData`, `AsyncLoading`, `AsyncError`) paired with automatic mounted-checks via `ref.set()` / `ref.runAsync()` eliminate asynchronous post-disposal crashes without manual `ref.isMounted` checks.
 * **Zero Dependencies:** Pure Dart/Flutter framework implementation—no `build_runner`, code generation, or third-party packages required.
 
-### What Is New in 0.2.0
+### What Is New in 0.3.0
+
+* Added `ZenithRef.set(node, value)` and `ZenithRef.runAsync(node, task)`: mounted-safe writes that silently no-op once the ref's scope is disposed, so you no longer need to manually check `ref.isMounted` after every `await`.
+* Added the `SafeAsyncNodeX.guard(ref, future)` extension on `ZenithNode<AsyncValue<T>>` as sugar over `ref.runAsync(...)`.
+* **Breaking:** `ZenithNode.set()` no longer throws `StateError` when called on a disposed node — it now fails silently (a no-op). Reading `.value`, calling `.invalidate()`, or `.subscribe()` on a disposed node still throw `StateError` as before.
+
+### What Was New in 0.2.0
 
 * Added `ZenithKey<T>` and typed container helpers: `getOrCreate`, `maybeReadKey`, `invalidateKey`.
 * Added scoped overrides with `ZenithOverride<T>`.
@@ -66,19 +72,23 @@ class CounterController {
   }
 
   Future<void> fetchUser(ZenithRef ref) async {
-    userProfileNode.set(AsyncLoading(userProfileNode.value.valueOrNull));
-    try {
-      final name = await Future.delayed(const Duration(seconds: 1), () => 'John Doe');
-      
-      // Always guard async state mutations with ref.isMounted
-      if (!ref.isMounted) return; 
-      
-      userProfileNode.set(AsyncData(name));
-    } catch (e, st) {
-      if (!ref.isMounted) return;
-      userProfileNode.set(AsyncError(e, st));
-    }
+    // ref.runAsync() automatically manages the loading/data/error
+    // transitions and drops the result if the scope is disposed mid-flight
+    // -- no manual `if (!ref.isMounted) return;` checks required.
+    await ref.runAsync(userProfileNode, () {
+      return Future.delayed(const Duration(seconds: 1), () => 'John Doe');
+    });
   }
+}
+
+```
+
+Prefer a more explicit call site? Use `ref.set()` for one-off mounted-safe writes:
+
+```dart
+Future<void> fetchUserManually(ZenithRef ref) async {
+  final name = await api.fetchUser();
+  ref.set(userProfileNode, AsyncData(name)); // Silently ignored if disposed.
 }
 
 ```
@@ -204,21 +214,27 @@ If you are an AI coding assistant (Cursor, Claude Code, Copilot, Devin, etc.) ge
 
 ### Rule 2: Memory & Async Safety
 
-* **Async Execution Guards:** ALL asynchronous operations (`Future`, `Stream`, or `Timer` callbacks) MUST check `ref.isMounted` before setting or mutating any `ZenithNode` value.
-* **Node Mutation Checks:** Do NOT attempt to read or mutate a disposed `ZenithNode`. Always ensure node disposal is handled through `ZenithContainer.dispose()` or `ref.onDispose()`.
+* **Prefer `ref.runAsync()` / `ref.set()`:** ALL asynchronous operations (`Future`, `Stream`, or `Timer` callbacks) that write to a `ZenithNode` SHOULD use `ref.runAsync(node, task)` (for `AsyncValue<T>` nodes) or `ref.set(node, value)` (for plain nodes) instead of manually checking `ref.isMounted`. Both silently no-op once the ref's scope is disposed.
+* **Manual guard as fallback:** If a helper isn't a good fit, checking `if (!ref.isMounted) return;` before mutation is still valid and supported.
+* **Node Mutation Checks:** Do NOT attempt to read a disposed `ZenithNode` (`.value` throws `StateError`). Always ensure node disposal is handled through `ZenithContainer.dispose()` or `ref.onDispose()`. Note that `ZenithNode.set()` itself is a safe no-op on a disposed node (it does not throw), but `ref.runAsync()`/`ref.set()` remain the preferred, self-guarding entry points.
 
 ```dart
 // ✅ CORRECT AI PATTERN:
 Future<void> loadData(ZenithRef ref) async {
-  final result = await api.fetch();
-  if (!ref.isMounted) return; // REQUIRED GUARD
-  node.set(AsyncData(result));
+  await ref.runAsync(node, () => api.fetch());
 }
 
-// ❌ INCORRECT AI PATTERN (DO NOT GENERATE):
+// ✅ ALSO CORRECT (manual write, still mounted-safe):
+Future<void> loadDataManually(ZenithRef ref) async {
+  final result = await api.fetch();
+  ref.set(node, AsyncData(result));
+}
+
+// ❌ AVOID (unnecessary manual guard -- use ref.runAsync()/ref.set() instead):
 Future<void> loadData(ZenithRef ref) async {
   final result = await api.fetch();
-  node.set(AsyncData(result)); // DANGEROUS: May execute post-disposal
+  if (!ref.isMounted) return;
+  node.set(AsyncData(result));
 }
 
 ```

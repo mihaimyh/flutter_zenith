@@ -67,20 +67,12 @@ class ExpenseDraftController {
       return;
     }
 
-    final previous = submitResultNode.value.valueOrNull;
-    submitResultNode.set(AsyncLoading<bool>(previous));
-
-    try {
+    // ref.runAsync() handles the loading/data/error transitions and
+    // automatically drops the result if this controller's scope is disposed
+    // mid-flight -- no manual `if (!ref.isMounted) return;` checks needed.
+    await _ref.runAsync(submitResultNode, () async {
       await Future<void>.delayed(const Duration(milliseconds: 200));
-      if (!_ref.isMounted) {
-        return;
-      }
-      submitResultNode.set(const AsyncData<bool>(true));
-    } catch (error, stackTrace) {
-      if (!_ref.isMounted) {
-        return;
-      }
-      submitResultNode.set(AsyncError<bool>(error, stackTrace));
-    }
+      return true;
+    });
   }
 }

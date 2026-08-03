@@ -1,5 +1,8 @@
 import 'package:flutter/foundation.dart';
 
+import 'zenith_container.dart';
+import 'zenith_node.dart';
+
 @immutable
 sealed class AsyncValue<T> {
   const AsyncValue();
@@ -50,4 +53,13 @@ class AsyncError<T> extends AsyncValue<T> {
   final StackTrace stackTrace;
 
   const AsyncError(this.error, this.stackTrace);
+}
+
+/// Adds mounted-safe async execution helpers directly on async state nodes.
+extension SafeAsyncNodeX<T> on ZenithNode<AsyncValue<T>> {
+  /// Executes [future] and writes its result to this node, guarding every
+  /// mutation with [ref]'s lifecycle. Equivalent to `ref.runAsync(this, future)`.
+  Future<void> guard(ZenithRef ref, Future<T> Function() future) {
+    return ref.runAsync(this, future);
+  }
 }

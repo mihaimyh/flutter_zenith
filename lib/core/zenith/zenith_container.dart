@@ -1,3 +1,4 @@
+import 'async_value.dart';
 import 'zenith_key.dart';
 import 'zenith_node.dart';
 
@@ -13,6 +14,41 @@ class ZenithRef {
   bool get isMounted => _isMounted;
 
   T read<T>(ZenithNode<T> node) => node.value;
+
+  /// Safely sets [node] to [value] only if this ref is still mounted.
+  ///
+  /// Silently drops the update if the underlying scope/container has been
+  /// disposed, so callers never need to manually check [isMounted] before
+  /// mutating state.
+  void set<T>(ZenithNode<T> node, T value) {
+    if (!_isMounted) return;
+    node.set(value);
+  }
+
+  /// Safely runs an async [task] and writes its result to [node], guarding
+  /// every mutation with this ref's mounted state.
+  ///
+  /// Sets [node] to [AsyncLoading] (preserving any previous data) before
+  /// awaiting [task], then to [AsyncData] on success or [AsyncError] on
+  /// failure -- but only if this ref is still mounted at each step. This
+  /// eliminates the need for manual `if (!ref.isMounted) return;` checks
+  /// after async boundaries.
+  Future<void> runAsync<T>(
+    ZenithNode<AsyncValue<T>> node,
+    Future<T> Function() task,
+  ) async {
+    if (!_isMounted) return;
+    node.set(AsyncLoading<T>(node.value.valueOrNull));
+
+    try {
+      final data = await task();
+      if (!_isMounted) return;
+      node.set(AsyncData<T>(data));
+    } catch (error, stackTrace) {
+      if (!_isMounted) return;
+      node.set(AsyncError<T>(error, stackTrace));
+    }
+  }
 
   void onDispose(void Function() callback) {
     if (!_isMounted) {

@@ -1,4 +1,21 @@
+## 0.3.0
+
+* Added `ZenithRef.set<T>(node, value)`: a mounted-safe write helper that
+  silently no-ops once the ref's scope has been disposed.
+* Added `ZenithRef.runAsync<T>(node, task)`: runs an async `task` and writes
+  `AsyncLoading` / `AsyncData` / `AsyncError` to an `AsyncValue<T>` node,
+  automatically guarding every mutation with the ref's mounted state so
+  manual `if (!ref.isMounted) return;` checks are no longer required.
+* Added `SafeAsyncNodeX.guard(ref, future)` extension on
+  `ZenithNode<AsyncValue<T>>` as sugar over `ref.runAsync(...)`.
+* **Breaking:** `ZenithNode.set()` no longer throws `StateError` when called
+  on a disposed node; it now fails silently (a no-op), matching the
+  semantics of a late/unmounted async write. Reading `.value`, calling
+  `.invalidate()`, or `.subscribe()` on a disposed node still throw
+  `StateError` as before.
+
 ## 0.2.0
+
 
 * Added type-safe dependency keys with `ZenithKey<T>`.
 * Added scoped factory overrides via `ZenithOverride<T>` and

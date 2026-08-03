@@ -417,8 +417,9 @@ void main() {
           node.set(42);
         });
 
-        // Also verify the un-guarded path throws a *catchable* StateError
-        // rather than crashing the isolate/zone.
+        // Also verify the un-guarded path no longer throws: ZenithNode.set()
+        // fails softly (silent no-op) on a disposed node instead of crashing
+        // the isolate/zone.
         final pendingUnguardedWrite = Future<void>(() async {
           await Future<void>.delayed(const Duration(milliseconds: 15));
           try {
@@ -436,9 +437,9 @@ void main() {
         expect(node.isDisposed, isTrue);
         // Node value was never mutated after disposal.
         expect(() => node.value, throwsStateError);
-        // The un-guarded write threw, but was safely caught -- no unhandled
-        // async exception escaped the zone.
-        expect(caughtError, isA<StateError>());
+        // The un-guarded write silently no-oped -- no exception thrown and
+        // no unhandled async exception escaped the zone.
+        expect(caughtError, isNull);
       },
     );
   });

@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart' show debugPrint;
+
 abstract class ZenithSubscriber {
   void onNodeChanged(ZenithNode<dynamic> node);
 }
@@ -41,7 +43,16 @@ class ZenithNode<T> {
 
   void set(T newValue) {
     if (_isDisposed) {
-      throw StateError('Cannot update a disposed ZenithNode');
+      // Late async writes after disposal are common and usually harmless (the
+      // UI/scope is simply gone). Fail softly instead of throwing so callers
+      // don't need to manually guard every post-await mutation.
+      assert(() {
+        debugPrint(
+          'ZenithNode.set() ignored: node is disposed (value: $newValue)',
+        );
+        return true;
+      }());
+      return;
     }
 
     if (_value == newValue) {
