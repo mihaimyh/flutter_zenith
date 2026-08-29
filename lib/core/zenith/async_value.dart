@@ -108,6 +108,9 @@ sealed class AsyncValue<T> {
   /// Whether this value holds successful data.
   bool get hasData => this is AsyncData<T>;
 
+  /// Alias for whether valueOrNull is non-null.
+  bool get hasValue => valueOrNull != null;
+
   /// Whether this value represents a failed operation.
   bool get hasError => this is AsyncError<T>;
 }

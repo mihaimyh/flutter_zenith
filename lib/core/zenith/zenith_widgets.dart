@@ -6,37 +6,12 @@ import 'zenith_node.dart';
 
 /// An [InheritedWidget] wrapper that binds a [ZenithContainer] to a subtree
 /// of the widget tree.
-///
-/// When the [container] is swapped (e.g., on user logout / session change),
-/// the old container is automatically disposed in [didUpdateWidget].
-/// When the scope is removed from the tree, the container is disposed in
-/// [dispose].
-///
-/// To force a clean container swap on session change, assign a distinct
-/// [ValueKey] to the [ZenithScope]:
-///
-/// ```dart
-/// ZenithScope(
-///   key: ValueKey(userId),
-///   container: container,
-///   child: const MyApp(),
-/// )
-/// ```
 class ZenithScope extends StatefulWidget {
-  /// The container to provide to descendant widgets.
   final ZenithContainer container;
-
-  /// The widget subtree that can access [container] via [ZenithScope.of].
   final Widget child;
 
-  /// Creates a [ZenithScope] that binds [container] to the [child] subtree.
   const ZenithScope({super.key, required this.container, required this.child});
 
-  /// Retrieves the nearest [ZenithContainer] from the widget tree.
-  ///
-  /// Throws an [AssertionError] in debug mode if:
-  /// - No [ZenithScope] exists above [context].
-  /// - The resolved container has already been disposed.
   static ZenithContainer of(BuildContext context) {
     final inherited = context
         .dependOnInheritedWidgetOfExactType<_ZenithScopeInherited>();
@@ -94,39 +69,11 @@ class _ZenithScopeInherited extends InheritedWidget {
 
 /// A widget that subscribes to [ZenithNode]s read inside its [builder]
 /// closure and surgically rebuilds only when those nodes change.
-///
-/// Dependencies are auto-tracked: any [ZenithNode.value] read during
-/// [builder] execution is subscribed to. On subsequent builds, stale
-/// subscriptions (nodes no longer read) are reconciled away.
-///
-/// ```dart
-/// ZenithBuilder(
-///   builder: (context) {
-///     final count = counterNode.value; // auto-subscribed
-///     return Text('Count: $count');
-///   },
-/// )
-/// ```
-///
-/// If the builder throws, [errorBuilder] is invoked (if provided) to render
-/// a fallback widget. If [errorBuilder] is not set, the error propagates
-/// normally.
 class ZenithBuilder extends StatefulWidget {
-  /// The builder function that reads [ZenithNode]s and returns a widget.
-  ///
-  /// Any [ZenithNode.value] accessed inside this closure is automatically
-  /// subscribed to — changes to those nodes trigger a rebuild of only this
-  /// widget.
   final Widget Function(BuildContext context) builder;
-
-  /// Optional error handler invoked when [builder] throws an exception.
-  ///
-  /// If `null`, exceptions propagate normally. When provided, the widget
-  /// renders the result of [errorBuilder] instead of crashing.
   final Widget Function(BuildContext context, Object error, StackTrace stack)?
       errorBuilder;
 
-  /// Creates a [ZenithBuilder].
   const ZenithBuilder({super.key, required this.builder, this.errorBuilder});
 
   @override
@@ -200,6 +147,81 @@ class _ZenithBuilderState extends State<ZenithBuilder>
   }
 }
 
+/// A drop-in replacement for Riverpod's ConsumerWidget.
+///
+/// Automatically tracks any Zenith node accessed during [buildConsumer].
+abstract class ZenithConsumerWidget extends StatelessWidget {
+  const ZenithConsumerWidget({super.key});
+
+  /// Build method that receives the [ZenithContainer] for convenience.
+  Widget buildConsumer(BuildContext context, ZenithContainer container);
+
+  @override
+  Widget build(BuildContext context) {
+    return ZenithBuilder(
+      builder: (ctx) => buildConsumer(ctx, ctx.container),
+    );
+  }
+}
+
+/// A widget that fires [listener] callbacks for side-effects (navigation, dialogs, snackbars)
+/// whenever [node] changes, without triggering UI rebuilds.
+class ZenithListener<T> extends StatefulWidget {
+  final ZenithNode<T> node;
+  final void Function(BuildContext context, T previous, T current) listener;
+  final Widget child;
+
+  const ZenithListener({
+    super.key,
+    required this.node,
+    required this.listener,
+    required this.child,
+  });
+
+  @override
+  State<ZenithListener<T>> createState() => _ZenithListenerState<T>();
+}
+
+class _ZenithListenerState<T> extends State<ZenithListener<T>>
+    implements ZenithSubscriber {
+  late T _previousValue;
+
+  @override
+  void initState() {
+    super.initState();
+    _previousValue = widget.node.value;
+    widget.node.subscribe(this);
+  }
+
+  @override
+  void didUpdateWidget(covariant ZenithListener<T> oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.node, widget.node)) {
+      oldWidget.node.unsubscribe(this);
+      _previousValue = widget.node.value;
+      widget.node.subscribe(this);
+    }
+  }
+
+  @override
+  void onNodeChanged(ZenithNode<dynamic> node) {
+    if (mounted) {
+      final currentValue = widget.node.value;
+      widget.listener(context, _previousValue, currentValue);
+      _previousValue = currentValue;
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.node.unsubscribe(this);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
+}
+
 /// Ergonomic helpers so widgets can access the current [ZenithContainer]
 /// directly from a [BuildContext] without a verbose [ZenithScope.of] call.
 extension ZenithContextX on BuildContext {
@@ -207,13 +229,21 @@ extension ZenithContextX on BuildContext {
   ZenithContainer get container => ZenithScope.of(this);
 
   /// Type-safe helper to read or create a node using a [ZenithKey].
-  ///
-  /// Looks up [key] in the nearest [ZenithContainer] and creates the node
-  /// via [factory] if it doesn't already exist.
   ZenithNode<T> zenith<T>(
     ZenithKey<T> key,
     T Function(ZenithRef ref) factory,
   ) {
     return ZenithScope.of(this).getOrCreate<T>(key, factory);
+  }
+
+  /// Evaluates and registers auto-subscription for [node] if called inside
+  /// a [ZenithBuilder] or [ZenithConsumerWidget].
+  T watchNode<T>(ZenithNode<T> node) {
+    return node.value;
+  }
+
+  /// Selects a field from [node], registering zone auto-subscription.
+  R selectNode<T, R>(ZenithNode<T> node, R Function(T state) selector) {
+    return selector(node.value);
   }
 }
