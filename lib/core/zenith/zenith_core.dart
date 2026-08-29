@@ -5,6 +5,7 @@ export 'persisted_node.dart';
 export 'zenith_concurrency.dart';
 export 'zenith_config.dart';
 export 'zenith_container.dart';
+export 'zenith_controller.dart';
 export 'zenith_environment.dart';
 export 'zenith_feature.dart';
 export 'zenith_key.dart';

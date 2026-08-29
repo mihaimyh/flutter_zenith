@@ -39,3 +39,16 @@ class ZenithOverride<T> {
   /// Creates a [ZenithOverride] that replaces the factory for [key].
   ZenithOverride(this.key, this.factory);
 }
+
+/// A strongly typed family identifier that creates a [ZenithKey] for any [argument].
+class ZenithFamily<T, Arg> {
+  /// The prefix name for this family.
+  final String name;
+
+  /// Creates a [ZenithFamily] with the given [name].
+  const ZenithFamily(this.name);
+
+  /// Resolves the specific [ZenithKey] for [argument].
+  ZenithKey<T> call(Arg argument) => ZenithKey<T>('$name#$argument');
+}
+

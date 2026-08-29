@@ -164,6 +164,95 @@ abstract class ZenithConsumerWidget extends StatelessWidget {
   }
 }
 
+/// A stateful widget that integrates with Zenith state management.
+///
+/// Subclasses must override [createState] and return a [ZenithState].
+abstract class ZenithStatefulWidget extends StatefulWidget {
+  const ZenithStatefulWidget({super.key});
+
+  @override
+  ZenithState<ZenithStatefulWidget> createState();
+}
+
+/// The state class for a [ZenithStatefulWidget].
+///
+/// Automatically tracks reactive dependencies during [buildZenith] and provides
+/// convenient access to [container] and state helpers.
+abstract class ZenithState<T extends ZenithStatefulWidget> extends State<T> {
+  /// Resolves the nearest [ZenithContainer] from the widget hierarchy.
+  ZenithContainer get container => context.container;
+
+  /// Builds the widget with the nearest [ZenithContainer] provided.
+  /// Automatically re-executes whenever any [ZenithNode] read during this build changes.
+  Widget buildZenith(BuildContext context, ZenithContainer container);
+
+  @override
+  Widget build(BuildContext context) {
+    return ZenithBuilder(
+      builder: (ctx) => buildZenith(ctx, ctx.container),
+    );
+  }
+}
+
+/// A mixin that can be added to any Flutter [State] to gain reactive Zenith capabilities
+/// and convenient node helpers without changing the widget's base class.
+mixin ZenithStateMixin<T extends StatefulWidget> on State<T> {
+  /// Resolves the nearest [ZenithContainer] from the widget hierarchy.
+  ZenithContainer get container => context.container;
+
+  final List<void Function()> _listeners = <void Function()>[];
+
+  /// Listens to [node] and executes [listener] when its value changes,
+  /// without triggering widget rebuilds. The listener is automatically removed on [dispose].
+  void listenNode<V>(
+    ZenithNode<V> node,
+    void Function(BuildContext context, V previous, V current) listener,
+  ) {
+    var previousValue = node.value;
+    final sub = _StateMixinSubscriber((changedNode) {
+      if (mounted) {
+        final currentValue = node.value;
+        listener(context, previousValue, currentValue);
+        previousValue = currentValue;
+      }
+    });
+    node.subscribe(sub);
+    _listeners.add(() => node.unsubscribe(sub));
+  }
+
+  @override
+  void dispose() {
+    for (final cleanup in _listeners) {
+      cleanup();
+    }
+    _listeners.clear();
+    super.dispose();
+  }
+}
+
+class _StateMixinSubscriber implements ZenithSubscriber {
+  final void Function(ZenithNode<dynamic> node) _onChanged;
+  _StateMixinSubscriber(this._onChanged);
+
+  @override
+  void onNodeChanged(ZenithNode<dynamic> node) => _onChanged(node);
+}
+
+/// An inline builder widget that subscribes to any [ZenithNode] read within [builder].
+class ZenithConsumer extends StatelessWidget {
+  final Widget Function(BuildContext context, ZenithContainer container, Widget? child) builder;
+  final Widget? child;
+
+  const ZenithConsumer({super.key, required this.builder, this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return ZenithBuilder(
+      builder: (ctx) => builder(ctx, ctx.container, child),
+    );
+  }
+}
+
 /// A widget that fires [listener] callbacks for side-effects (navigation, dialogs, snackbars)
 /// whenever [node] changes, without triggering UI rebuilds.
 class ZenithListener<T> extends StatefulWidget {
@@ -242,8 +331,16 @@ extension ZenithContextX on BuildContext {
     return node.value;
   }
 
+  /// Evaluates and registers auto-subscription for [node] if called inside
+  /// a [ZenithBuilder] or [ZenithConsumerWidget].
+  T watch<T>(ZenithNode<T> node) => watchNode(node);
+
   /// Selects a field from [node], registering zone auto-subscription.
   R selectNode<T, R>(ZenithNode<T> node, R Function(T state) selector) {
     return selector(node.value);
   }
+
+  /// Selects a field from [node], registering zone auto-subscription.
+  R select<T, R>(ZenithNode<T> node, R Function(T state) selector) =>
+      selectNode(node, selector);
 }

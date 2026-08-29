@@ -33,7 +33,9 @@ class ZenithRef {
   final List<void Function()> _onDisposeCallbacks = <void Function()>[];
 
   /// Creates a [ZenithRef] bound to [container].
-  ZenithRef(this.container);
+  ZenithRef(this.container) {
+    container._registerRef(this);
+  }
 
   /// Whether the owning container is still alive.
   ///
@@ -146,8 +148,17 @@ class ZenithContainer {
   final Map<NodeKey, ZenithNode<dynamic>> _nodes =
       <NodeKey, ZenithNode<dynamic>>{};
   final Map<NodeKey, ZenithRef> _refs = <NodeKey, ZenithRef>{};
+  final Set<ZenithRef> _activeRefs = <ZenithRef>{};
   final Map<ZenithKey<dynamic>, Function> _overrides;
   bool _isDisposed = false;
+
+  void _registerRef(ZenithRef ref) {
+    if (_isDisposed) {
+      ref._dispose();
+      return;
+    }
+    _activeRefs.add(ref);
+  }
 
   /// Creates a [ZenithContainer], optionally with a [parent] for fallback
   /// resolution, [overrides], and environment-specific [environmentOverrides].
@@ -314,7 +325,7 @@ class ZenithContainer {
       return;
     }
 
-    for (final ref in _refs.values.toList(growable: false)) {
+    for (final ref in _activeRefs.toList(growable: false)) {
       ref._dispose();
     }
 
@@ -322,6 +333,7 @@ class ZenithContainer {
       node.dispose();
     }
 
+    _activeRefs.clear();
     _refs.clear();
     _nodes.clear();
   }
@@ -343,7 +355,7 @@ class ZenithContainer {
 
     _isDisposed = true;
 
-    for (final ref in _refs.values.toList(growable: false)) {
+    for (final ref in _activeRefs.toList(growable: false)) {
       ref._dispose();
     }
 
@@ -351,6 +363,7 @@ class ZenithContainer {
       node.dispose();
     }
 
+    _activeRefs.clear();
     _refs.clear();
     _nodes.clear();
   }

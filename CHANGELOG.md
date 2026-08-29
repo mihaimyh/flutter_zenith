@@ -1,3 +1,30 @@
+## 0.10.0
+
+* **Controller Base Class (`ZenithController`):** Added a scoped base
+  class for business logic with lifecycle hooks, mounted-safe node writes,
+  async task handling, and stream subscriptions that clean up with its
+  `ZenithRef`.
+* **Stateful Widget Integration:** Added `ZenithStatefulWidget`,
+  `ZenithState`, and `ZenithStateMixin` for reactive stateful widgets and
+  lifecycle-safe, side-effect-only node listeners.
+* **Inline Reactive Builder (`ZenithConsumer`):** Added a lightweight
+  builder widget for reactive reads without creating a dedicated widget
+  subclass.
+* **Typed Key Families (`ZenithFamily`):** Added reusable typed key factories
+  for argument-specific container dependencies.
+* **Watch and Select Aliases:** Added `BuildContext.watch` and
+  `BuildContext.select` as concise aliases for the existing node helpers.
+* **Ref Disposal:** Container resets and disposal now clean up every active
+  `ZenithRef`, including explicitly created refs.
+
+## 0.9.0
+
+* **`ZenithConsumerWidget`:** Ergonomic base widget providing `build(BuildContext context, ZenithRef ref)` for declarative, reactive consumption of Zenith nodes and container services without requiring nested `ZenithBuilder` widgets.
+* **Side-Effect Listener (`ZenithListener`):** Dedicated widget for listening to state changes on a `ZenithNode<T>` and executing callbacks (e.g. navigation, notifications, snackbars, analytics) without causing widget rebuilds.
+* **Ergonomic Ref/Context Extensions (`watchNode`, `selectNode`):** Added high-level extension methods on `ZenithRef` and `BuildContext` to watch nodes or project derived state selections with automatic lifecycle subscription cleanup.
+* **`AsyncValue.hasValue`:** Added convenient boolean getter `hasValue` on `AsyncValue<T>` to quickly check if a value is present (both in data and previous loading/error states).
+* **Cyclic Dependency Detection:** Added graph cycle detection in `ComputedNode` to safeguard against recursion loops during derived computation evaluations.
+
 ## 0.8.0
 
 * **In-Memory Mediator (`ZenithMediator`):** MediatR equivalent supporting 1-to-1 Commands (`ZenithCommand<R>`), 1-to-Many Domain Events (`ZenithEvent`), and cross-cutting `ZenithPipelineBehavior` wrappers with re-entrancy depth safeguards and error isolation.
