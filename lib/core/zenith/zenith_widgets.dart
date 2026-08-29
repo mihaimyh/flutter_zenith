@@ -109,6 +109,14 @@ class _ZenithBuilderState extends State<ZenithBuilder>
       node.unsubscribe(this);
     }
 
+    final newNodes = _nodesReadThisBuild
+        .where((node) => !_observedNodes.contains(node))
+        .toList(growable: false);
+
+    for (final node in newNodes) {
+      node.subscribe(this);
+    }
+
     _observedNodes
       ..clear()
       ..addAll(_nodesReadThisBuild);
