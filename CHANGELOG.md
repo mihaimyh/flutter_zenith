@@ -1,3 +1,10 @@
+## 0.8.0
+
+* **In-Memory Mediator (`ZenithMediator`):** MediatR equivalent supporting 1-to-1 Commands (`ZenithCommand<R>`), 1-to-Many Domain Events (`ZenithEvent`), and cross-cutting `ZenithPipelineBehavior` wrappers with re-entrancy depth safeguards and error isolation.
+* **Resilience & Fault Handling (`ZenithResilience`):** Polly equivalent featuring `ZenithResiliencePipeline` with Exponential Backoff Retry (with randomized jitter to prevent thundering herd spikes), `CircuitBreaker` (`closed`, `open`, `halfOpen`), and sliding window `RateLimiter`.
+* **Strongly-Typed Validation Engine (`ZenithValidator`):** FluentValidation equivalent with fluent rule builders (`notEmpty`, `email`, `minLength`, `greaterThan`, `must`), ReDoS safety, and `ZenithValidatedNode<T>` for auto-validating state nodes.
+* **Structured Logger & Extensible Sinks (`ZenithLogger`):** Serilog equivalent supporting message template interpolation, automatic PII Redaction (`password`, `token`, `secret`, `credit_card`), `ConsoleSink`, and fixed-capacity `MemoryRingBufferSink` for zero OOM memory growth.
+
 ## 0.7.0
 
 * **Feature Management & Feature Flags:** Introduced `ZenithFeature`, `FeatureNode`, and `ZenithFeatureBuilder` widget for reactive feature flag rollouts, Remote Config integration, and percentage rollout rule evaluation.

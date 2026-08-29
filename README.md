@@ -19,7 +19,14 @@ A high-performance, container-scoped state management and dependency injection e
 * **Concurrency & Isolate Guards:** `ref.runAsyncGuarded(node, task, strategy: ...)` solves race conditions between overlapping async calls (`droppable` for double-submit prevention, `restartable` for stale-response prevention), and `ref.runInIsolate(node, payload, heavyComputation)` offloads heavy synchronous work to a background `Isolate` without leaving the `AsyncValue` state machine.
 * **Zero Dependencies:** Pure Dart/Flutter framework implementation—no `build_runner`, code generation, or third-party packages required.
 
-### What Is New in 0.7.0
+### What Is New in 0.8.0
+
+* **In-Memory Mediator:** Introduced `ZenithMediator` (MediatR equivalent) for 1-to-1 Commands (`ZenithCommand`), 1-to-Many Domain Events (`ZenithEvent`), and `ZenithPipelineBehavior` wrappers.
+* **Resilience Pipelines:** Added `ZenithResiliencePipeline` (Polly equivalent) with Exponential Backoff Retry (with randomized jitter), `CircuitBreaker`, and `RateLimiter`.
+* **Fluent Validation Engine:** Added `ZenithValidator` (FluentValidation equivalent) with chainable rule builders and `ZenithValidatedNode<T>`.
+* **Structured Logger & Extensible Sinks:** Introduced `ZenithLogger` (Serilog equivalent) with automatic PII Redaction and fixed-capacity `MemoryRingBufferSink`.
+
+### What Was New in 0.7.0
 
 * **Feature Management & Feature Flags:** Introduced `ZenithFeature`, `FeatureNode`, and `ZenithFeatureBuilder` widget for reactive feature flag rollouts and percentage rule evaluation.
 * **Options Pattern:** Introduced `ZenithConfigNode<T>` (ASP.NET Core `IOptionsMonitor<T>` equivalent) for dynamic JSON/Map configuration decoding.
