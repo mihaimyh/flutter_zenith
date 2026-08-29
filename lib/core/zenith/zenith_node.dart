@@ -101,12 +101,22 @@ class ZenithNode<T> {
   /// Intended for debugging and testing only.
   int get debugSubscriberCount => _subscribers.length;
 
-  /// Updates the node's value to [newValue] and notifies subscribers.
+  /// Attempts to update the value of this node.
+  ///
+  /// Returns `true` if the value was set, or `false` if the node is already
+  /// disposed. Does not emit debug warnings on disposed nodes.
+  bool trySet(T newValue) {
+    if (_isDisposed) return false;
+    set(newValue);
+    return true;
+  }
+
+  /// Sets the value of this node and notifies all active subscribers.
   ///
   /// If [newValue] is equal to the current value (via `==`), this is a
   /// no-op and no notifications are sent.
   ///
-  /// If the node has been disposed, the call is silently ignored (a debug
+  /// If the node has been disposed, the call is silently ignored (a concise debug
   /// message is printed in debug mode). This soft-fail behavior prevents
   /// crashes from late async writes that land after scope disposal.
   void set(T newValue) {
@@ -116,7 +126,7 @@ class ZenithNode<T> {
       // don't need to manually guard every post-await mutation.
       assert(() {
         debugPrint(
-          'ZenithNode.set() ignored: node is disposed (value: $newValue)',
+          'ZenithNode<$T>.set() ignored: node is disposed',
         );
         return true;
       }());

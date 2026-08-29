@@ -1,3 +1,8 @@
+## 0.11.2 - Native Soft-Fail Enhancements & Sanitized Diagnostics
+
+* **`ZenithNode.trySet`:** Added typed `bool trySet(T newValue)` returning `false` when called on disposed nodes without emitting debug warnings.
+* **Sanitized Disposed Node Diagnostics:** Sanitized `ZenithNode.set()` debug assert messages to avoid dumping payload objects or sensitive token data when late async writes land after scope teardown.
+
 ## 0.11.1 - Scope Bridge Resiliency & Optional Fallbacks
 
 * **`ZenithScopeProvider.maybeOf`:** Added safe lookup method returning `ZenithTenantScope?` when called outside a scope provider boundary.
