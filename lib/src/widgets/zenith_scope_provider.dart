@@ -31,6 +31,13 @@ class ZenithScopeProvider extends InheritedWidget {
     return provider!.scope;
   }
 
+  /// Retrieves the nearest [ZenithTenantScope] from [context], or null if none exists.
+  static ZenithTenantScope? maybeOf(BuildContext context) {
+    return context
+        .dependOnInheritedWidgetOfExactType<ZenithScopeProvider>()
+        ?.scope;
+  }
+
   @override
   bool updateShouldNotify(covariant ZenithScopeProvider oldWidget) =>
       !identical(oldWidget.scope, scope);

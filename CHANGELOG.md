@@ -1,3 +1,8 @@
+## 0.11.1 - Scope Bridge Resiliency & Optional Fallbacks
+
+* **`ZenithScopeProvider.maybeOf`:** Added safe lookup method returning `ZenithTenantScope?` when called outside a scope provider boundary.
+* **`zenithShowModalBottomSheet` Graceful Fallback:** Automatically resolves `ZenithScopeProvider.maybeOf` and preserves modal bottom sheets even if opened outside a tenant scope hierarchy.
+
 ## 0.11.0 - Multi-Tenant Scoping, Identity & Enterprise Policy Engine (`zenith_identity`)
 
 * **Standalone Enterprise Barrel (`zenith_identity.dart`):** Added a dedicated entry point for multi-tenant scoping, identity management, policy-based authorization, and compliance isolation.

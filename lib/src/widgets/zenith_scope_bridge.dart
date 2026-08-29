@@ -29,7 +29,7 @@ extension ZenithScopeBridgeX on BuildContext {
     Color? backgroundColor,
     ShapeBorder? shape,
   }) {
-    final scope = ZenithScopeProvider.of(this);
+    final scope = ZenithScopeProvider.maybeOf(this);
     return showModalBottomSheet<T>(
       context: this,
       isScrollControlled: isScrollControlled,
@@ -37,10 +37,12 @@ extension ZenithScopeBridgeX on BuildContext {
       isDismissible: isDismissible,
       backgroundColor: backgroundColor,
       shape: shape,
-      builder: (sheetContext) => ZenithScopeProvider(
-        scope: scope,
-        child: Builder(builder: builder),
-      ),
+      builder: (sheetContext) => scope != null
+          ? ZenithScopeProvider(
+              scope: scope,
+              child: Builder(builder: builder),
+            )
+          : Builder(builder: builder),
     );
   }
 }
