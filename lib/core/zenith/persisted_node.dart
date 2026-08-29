@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart' show debugPrint;
+
 import 'zenith_node.dart';
 import 'zenith_storage.dart';
 
@@ -105,7 +107,16 @@ class PersistedNode<T> extends ZenithNode<T> {
 
     // If the value changed and node is not disposed, write to storage.
     if (value != oldValue && !isDisposed) {
-      storage.write(key, toStorage(newValue));
+      try {
+        storage.write(key, toStorage(newValue));
+      } catch (error, stackTrace) {
+        assert(() {
+          debugPrint(
+            'PersistedNode storage write failed for key "$key": $error\n$stackTrace',
+          );
+          return true;
+        }());
+      }
     }
   }
 }

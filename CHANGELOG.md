@@ -1,3 +1,10 @@
+## 0.7.0
+
+* **Feature Management & Feature Flags:** Introduced `ZenithFeature`, `FeatureNode`, and `ZenithFeatureBuilder` widget for reactive feature flag rollouts, Remote Config integration, and percentage rollout rule evaluation.
+* **Options Pattern (`ZenithConfigNode<T>`):** Introduced dynamic configuration nodes (ASP.NET Core `IOptionsMonitor<T>` equivalent) that decode JSON/Map updates and notify subscribers only on parsed config changes.
+* **Environment Profiles (`ZenithEnvironment`):** Added `ZenithEnvironment` (`development`, `staging`, `production`) and `environmentOverrides` to `ZenithContainer` for environment-aware DI registration.
+* **Hosted Background Services (`ZenithService`):** Introduced lifecycle-managed background service contract (`onStart`, `onStop`) with concrete implementations `ZenithPeriodicService` (periodic background task runner) and `ZenithIsolateService` (background Isolate worker).
+
 ## 0.6.0
 
 * **In-Place Scope Reset:** Added `ZenithContainer.reset()` to clear all nodes and references in an existing container without destroying the container instance itself (ideal for multi-user logout).

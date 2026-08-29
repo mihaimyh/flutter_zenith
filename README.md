@@ -19,7 +19,14 @@ A high-performance, container-scoped state management and dependency injection e
 * **Concurrency & Isolate Guards:** `ref.runAsyncGuarded(node, task, strategy: ...)` solves race conditions between overlapping async calls (`droppable` for double-submit prevention, `restartable` for stale-response prevention), and `ref.runInIsolate(node, payload, heavyComputation)` offloads heavy synchronous work to a background `Isolate` without leaving the `AsyncValue` state machine.
 * **Zero Dependencies:** Pure Dart/Flutter framework implementation—no `build_runner`, code generation, or third-party packages required.
 
-### What Is New in 0.6.0
+### What Is New in 0.7.0
+
+* **Feature Management & Feature Flags:** Introduced `ZenithFeature`, `FeatureNode`, and `ZenithFeatureBuilder` widget for reactive feature flag rollouts and percentage rule evaluation.
+* **Options Pattern:** Introduced `ZenithConfigNode<T>` (ASP.NET Core `IOptionsMonitor<T>` equivalent) for dynamic JSON/Map configuration decoding.
+* **Environment Profiles:** Added `ZenithEnvironment` (`development`, `staging`, `production`) and environment-specific DI overrides in `ZenithContainer`.
+* **Hosted Background Services:** Added `ZenithService` lifecycle worker contract with concrete implementations `ZenithPeriodicService` and `ZenithIsolateService`.
+
+### What Was New in 0.6.0
 
 * **In-Place Container Reset:** Added `container.reset()` to teardown all nodes and references in an existing container without destroying the container instance.
 * **Auth State Machine:** Added `AuthState<T>` (`AuthUnauthenticated`, `AuthAuthenticating`, `AuthAuthenticated<T>`, `AuthError`) with exhaustive pattern matching and boolean status getters.

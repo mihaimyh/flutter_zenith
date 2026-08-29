@@ -1,4 +1,7 @@
+import 'package:flutter/foundation.dart' show debugPrint;
+
 import 'async_value.dart';
+import 'zenith_environment.dart';
 import 'zenith_key.dart';
 import 'zenith_node.dart';
 
@@ -95,7 +98,16 @@ class ZenithRef {
     _isMounted = false;
 
     for (final callback in List<void Function()>.from(_onDisposeCallbacks)) {
-      callback();
+      try {
+        callback();
+      } catch (error, stackTrace) {
+        assert(() {
+          debugPrint(
+            'ZenithRef onDispose callback threw during teardown: $error\n$stackTrace',
+          );
+          return true;
+        }());
+      }
     }
 
     _onDisposeCallbacks.clear();
@@ -128,6 +140,9 @@ class ZenithContainer {
   /// Optional parent container for hierarchical dependency resolution.
   final ZenithContainer? parent;
 
+  /// The active runtime environment for this container.
+  final ZenithEnvironment environment;
+
   final Map<NodeKey, ZenithNode<dynamic>> _nodes =
       <NodeKey, ZenithNode<dynamic>>{};
   final Map<NodeKey, ZenithRef> _refs = <NodeKey, ZenithRef>{};
@@ -135,13 +150,37 @@ class ZenithContainer {
   bool _isDisposed = false;
 
   /// Creates a [ZenithContainer], optionally with a [parent] for fallback
-  /// resolution and [overrides] for factory substitution.
+  /// resolution, [overrides], and environment-specific [environmentOverrides].
   ZenithContainer({
     this.parent,
+    this.environment = ZenithEnvironment.production,
     List<ZenithOverride<dynamic>> overrides = const [],
-  }) : _overrides = {
-         for (final override in overrides) override.key: override.factory,
-       };
+    Map<ZenithEnvironment, List<ZenithOverride<dynamic>>> environmentOverrides =
+        const {},
+  }) : _overrides = _buildOverridesMap(
+         overrides: overrides,
+         environment: environment,
+         environmentOverrides: environmentOverrides,
+       );
+
+  static Map<ZenithKey<dynamic>, Function> _buildOverridesMap({
+    required List<ZenithOverride<dynamic>> overrides,
+    required ZenithEnvironment environment,
+    required Map<ZenithEnvironment, List<ZenithOverride<dynamic>>>
+        environmentOverrides,
+  }) {
+    final map = <ZenithKey<dynamic>, Function>{};
+    for (final override in overrides) {
+      map[override.key] = override.factory;
+    }
+    final envSpecific = environmentOverrides[environment];
+    if (envSpecific != null) {
+      for (final override in envSpecific) {
+        map[override.key] = override.factory;
+      }
+    }
+    return map;
+  }
 
   /// Whether this container has been disposed.
   bool get isDisposed => _isDisposed;
