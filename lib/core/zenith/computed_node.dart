@@ -111,12 +111,12 @@ class ComputedNode<T> extends ZenithNode<T>
   }
 
   @override
-  void dispose() {
+  void dispose({bool purgeZeroize = false}) {
     for (final node in _trackedSources.toList(growable: false)) {
       node.unsubscribe(this);
     }
     _trackedSources.clear();
     _nodesReadThisCompute.clear();
-    super.dispose();
+    super.dispose(purgeZeroize: purgeZeroize);
   }
 }

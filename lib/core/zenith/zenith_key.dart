@@ -50,5 +50,46 @@ class ZenithFamily<T, Arg> {
 
   /// Resolves the specific [ZenithKey] for [argument].
   ZenithKey<T> call(Arg argument) => ZenithKey<T>('$name#$argument');
+
+  /// Creates a registry for tracking family keys in one container scope.
+  ZenithFamilyRegistry<T, Arg> registry() => ZenithFamilyRegistry<T, Arg>(this);
+}
+
+/// Tracks the keys created for one [ZenithFamily] within a logical scope.
+///
+/// The registry intentionally owns keys only; node ownership remains with the
+/// [ZenithContainer]. This allows callers to batch-invalidate a family without
+/// coupling the family definition to any particular container lifecycle.
+class ZenithFamilyRegistry<T, Arg> {
+  /// Creates a registry for [family].
+  ZenithFamilyRegistry(this.family);
+
+  /// The family that creates keys for this registry.
+  final ZenithFamily<T, Arg> family;
+  final Map<Arg, ZenithKey<T>> _keys = <Arg, ZenithKey<T>>{};
+
+  /// Returns the stable key associated with [argument].
+  ZenithKey<T> key(Arg argument) =>
+      _keys.putIfAbsent(argument, () => family(argument));
+
+  /// Arguments currently tracked by this registry.
+  Iterable<Arg> get arguments => _keys.keys;
+
+  /// Invalidates all nodes represented by tracked family keys in [container].
+  void invalidateAll(ZenithContainer container) {
+    for (final key in _keys.values) {
+      container.invalidateKey(key);
+    }
+  }
+
+  /// Stops tracking [argument]. Existing container state is unchanged.
+  void forget(Arg argument) {
+    _keys.remove(argument);
+  }
+
+  /// Stops tracking all arguments. Existing container state is unchanged.
+  void forgetAll() {
+    _keys.clear();
+  }
 }
 

@@ -19,7 +19,17 @@ A high-performance, container-scoped state management and dependency injection e
 * **Concurrency & Isolate Guards:** `ref.runAsyncGuarded(node, task, strategy: ...)` solves race conditions between overlapping async calls (`droppable` for double-submit prevention, `restartable` for stale-response prevention), and `ref.runInIsolate(node, payload, heavyComputation)` offloads heavy synchronous work to a background `Isolate` without leaving the `AsyncValue` state machine.
 * **Zero Dependencies:** Pure Dart/Flutter framework implementation—no `build_runner`, code generation, or third-party packages required.
 
-### What Is New in 0.8.0
+### What Is New in 0.11.0
+
+* **Enterprise Identity & Multi-Tenant Engine (`zenith_identity`):** Introduced a standalone entry point (`package:flutter_zenith/zenith_identity.dart`) delivering:
+  - **Multi-Tenant Scope Hierarchy:** `ZenithScopeManager` supporting `AppScope` → `UserScope` → `WorkspaceScope` with Zone-based Captive Dependency Guards.
+  - **Identity Coordinator:** Dual-container state migration with transactional rollback on I/O failure and biometric fast-lock session pausing.
+  - **Partitioned Storage & Resilient Outbox:** Per-tenant disk storage namespacing and an offline outbox with exponential backoff and dead-letter isolation.
+  - **Policy-Based Authorization Engine:** `ZenithPolicy`, composite `ZenithRequirement` rules, reactive `ZenithAuthorizeView`, and `ZenithRouteGuard`.
+  - **Enterprise Security & Compliance:** Strictly-typed `Zeroizable` buffers (`ZenithSecureBytes`), physical SQLite DB file isolation (`ZenithDatabasePool`), and inter-isolate invalidation (`ZenithIpc`).
+  - **Route Scope Bridge:** `zenithShowModalBottomSheet` for declarative scope inheritance across Flutter modal routes.
+
+### What Was New in 0.8.0
 
 * **In-Memory Mediator:** Introduced `ZenithMediator` (MediatR equivalent) for 1-to-1 Commands (`ZenithCommand`), 1-to-Many Domain Events (`ZenithEvent`), and `ZenithPipelineBehavior` wrappers.
 * **Resilience Pipelines:** Added `ZenithResiliencePipeline` (Polly equivalent) with Exponential Backoff Retry (with randomized jitter), `CircuitBreaker`, and `RateLimiter`.
@@ -379,24 +389,29 @@ Widget build(BuildContext context) {
 ```
 flutter_zenith/
 ├── lib/
-│   ├── flutter_zenith.dart            # Main export barrel file
-│   └── core/
-│       └── zenith/
-│           ├── async_value.dart       # AsyncValue state machine (Data, Loading, Error)
-│           ├── zenith_concurrency.dart # ConcurrencyStrategy, runAsyncGuarded, runInIsolate
-│           ├── zenith_node.dart        # Atomic reactive nodes with WeakRef tracking
-│           ├── zenith_container.dart   # Memory DI container, ref lifecycle, & scoping
-│           ├── zenith_widgets.dart     # ZenithScope & surgical ZenithBuilder
-│           └── zenith_core.dart       # Internal framework barrel
+│   ├── flutter_zenith.dart            # Core reactive & DI framework barrel
+│   ├── zenith_identity.dart           # Multi-tenant scoping & identity barrel
+│   ├── core/                          # Primitives (Nodes, Containers, AsyncValue, Zeroizable)
+│   ├── testing/                       # Test utilities (ZenithTestContainer, ZenithMutation)
+│   └── src/                           # Enterprise features
+│       ├── scope/                     # ScopeManager, UserScope, Drainable, IPC
+│       ├── identity/                  # Auth state machine, IdentityCoordinator
+│       ├── storage/                   # Partitioned storage driver, Outbox engine
+│       ├── authorization/             # Policy engine, AuthorizeView, RouteGuard
+│       ├── widgets/                   # ScopeProvider, ScopeBridge, AuthScope
+│       ├── concurrency/               # CancellationToken, ConcurrencyRunner
+│       └── enterprise/                # DatabasePool, SecureBytes
 ├── test/
-│   └── core/
-│       └── zenith/
-│           ├── zenith_lifecycle_test.dart        # Teardown & isMounted validation
-│           ├── zenith_memory_test.dart           # Weak reference & GC pruning tests
-│           ├── zenith_widget_test.dart           # Rebuild isolation verification
-│           ├── zenith_scope_test.dart            # Scope swap & disposal tests
-│           └── zenith_benchmark_widget_test.dart # High-load stress & performance tests
-└── example/                            # Runnable demo app
+│   ├── core/                          # Core reactive & DI test suites
+│   ├── scope/                         # Scope isolation & Captive Guard tests
+│   ├── identity/                      # Migration & state machine tests
+│   ├── storage/                       # Partitioned storage & outbox tests
+│   ├── authorization/                 # Policy engine & AuthorizeView tests
+│   ├── widgets/                       # Scope bridge & navigation unwind tests
+│   ├── concurrency/                   # Cancellation token & HTTP abort tests
+│   ├── enterprise/                    # Zeroization & DB isolation tests
+│   └── advanced/                      # IPC, 3-tier hierarchy & route guard tests
+└── example/                           # Runnable demo app
 
 ```
 

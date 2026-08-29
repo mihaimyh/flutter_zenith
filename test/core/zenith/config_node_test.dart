@@ -51,7 +51,8 @@ void main() {
       );
 
       var notifications = 0;
-      configNode.subscribe(_CountingSubscriber(() => notifications++));
+      final sub1 = _CountingSubscriber(() => notifications++);
+      configNode.subscribe(sub1);
 
       configNode.updateRaw({
         'api_endpoint': 'https://v2.api.example.com',
@@ -71,7 +72,8 @@ void main() {
       );
 
       var notifications = 0;
-      configNode.subscribe(_CountingSubscriber(() => notifications++));
+      final sub2 = _CountingSubscriber(() => notifications++);
+      configNode.subscribe(sub2);
 
       // Same values as defaultConfig
       configNode.updateRaw({

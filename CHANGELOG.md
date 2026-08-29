@@ -1,3 +1,39 @@
+## 0.11.0 - Multi-Tenant Scoping, Identity & Enterprise Policy Engine (`zenith_identity`)
+
+* **Standalone Enterprise Barrel (`zenith_identity.dart`):** Added a dedicated entry point for multi-tenant scoping, identity management, policy-based authorization, and compliance isolation.
+* **Scope Hierarchy & Lifetime Management (`ZenithScopeManager`):**
+  - Added `ZenithScopeManager` supporting 3-tier hierarchy (`AppScope` → `UserScope` → `WorkspaceScope`).
+  - **Zone-Based Captive Dependency Guard:** Traps singleton factories resolving scoped dependencies from child containers via Dart Zones (`#zenith_is_singleton_construction`), throwing `ZenithCaptiveDependencyException`.
+  - Added `ZenithDrainable` and two-phase asynchronous scope teardown (`drainAndDispose`).
+* **Identity Lifecycle & Migration Engine (`ZenithIdentityCoordinator`):**
+  - Exhaustive sealed `ZenithAuthState` machine (`AuthUnauthenticated`, `AuthAnonymous`, `AuthAuthenticated<T>`, `AuthMigrating`, `AuthLocked`).
+  - Dual-container anonymous-to-authenticated data migration with automatic transactional rollback on I/O error (`ZenithMigrationException`).
+  - Biometric fast-lock session pausing (`lockSession` / `unlockSession`) keeping DB handles open.
+  - Back-channel remote revocation listener and signal ingestion.
+* **Partitioned Storage & Offline Outbox:**
+  - `ZenithPartitionedStorage`: Per-tenant key-prefix isolation (`tenants/{id}/key`).
+  - `ZenithOutboxEngine`: Tenant-isolated offline mutation queue with exponential backoff, clock-drift guards, and dead-letter queue isolation to prevent head-of-line blocking.
+* **Policy-Based Authorization Engine:**
+  - `ZenithPolicy`: Synchronous, reactive lambda, and asynchronous permission policies.
+  - `ZenithRequirement`: Composite rules (`RoleRequirement`, `EntitlementRequirement`, `QuotaRequirement`).
+  - `ZenithAuthorizeView`: Reactive widget with allocation-free `ZenithSubscriber` direct evaluation and `.hidden` / `.locked` builders.
+  - `ZenithRouteGuard`: Route guard evaluator providing seamless redirection on denied access.
+* **Widget Tree Scope Integration:**
+  - `ZenithScopeProvider`: `InheritedWidget` boundary binding `ZenithTenantScope` to the widget tree.
+  - `ZenithScopeBridge`: Route scope tunneling via `zenithShowModalBottomSheet` ensuring modal routes inherit parent container dependencies.
+  - `ZenithAuthScope`: Declarative authentication UI switching with clean navigation unwinding before container disposal.
+* **Concurrency & Task Abort:**
+  - `ZenithCancellationToken`: One-shot cancellation signal triggered automatically on scope teardown.
+  - `ZenithConcurrencyRunner`: Restartable and guarded async task runner supporting physical HTTP and I/O aborts.
+* **Enterprise Compliance & Security:**
+  - `Zeroizable`: Strictly-typed core interface for sensitive memory buffer zeroization with `0x00`.
+  - `ZenithSecureBytes`: Cryptographic byte container with eager zeroization on node reassignment and automatic container wipe.
+  - `ZenithDatabasePool`: Per-tenant physical SQLite database file isolation (`tenants/{id}/data.db`) with automatic drainable lifecycle binding.
+  - `ZenithIpc`: Cross-isolate invalidation routing over `IsolateNameServer`.
+* **Ergonomic Enhancements:**
+  - Added `set value(T newValue)` on `ZenithNode` for direct assignment syntax alongside `node.set()`.
+  - Added `ZenithMutation` and test helpers in `testing/zenith_test.dart`.
+
 ## 0.10.0
 
 * **Controller Base Class (`ZenithController`):** Added a scoped base

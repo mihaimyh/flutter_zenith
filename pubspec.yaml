@@ -12,7 +12,7 @@ topics:
   - reactive
   - signals
 
-version: 0.10.0
+version: 0.11.0
 
 environment:
   sdk: ^3.12.2
@@ -25,4 +25,5 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+  test: ^1.24.0
 

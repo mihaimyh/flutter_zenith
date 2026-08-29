@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart' show debugPrint;
 
 import 'zenith_middleware.dart';
 import 'zenith_observer.dart';
+import 'zenith_zeroizable.dart';
 
 /// Interface for objects that want to be notified when a [ZenithNode] changes.
 ///
@@ -81,6 +82,13 @@ class ZenithNode<T> {
     return _value;
   }
 
+  /// Sets the value of this node via assignment syntax.
+  ///
+  /// Equivalent to calling [set]. Provided for ergonomic symmetry with the
+  /// [value] getter so callers can write `node.value = newValue` instead of
+  /// `node.set(newValue)`.
+  set value(T newValue) => set(newValue);
+
   /// Whether this node has been disposed.
   ///
   /// A disposed node cannot be read, subscribed to, or invalidated.
@@ -129,6 +137,9 @@ class ZenithNode<T> {
     }
 
     final oldValue = _value;
+    if (oldValue is Zeroizable && !identical(oldValue, effectiveValue)) {
+      oldValue.zeroize();
+    }
     _value = effectiveValue;
 
     Zenith.observer?.onNodeMutated(this, oldValue, effectiveValue);
@@ -230,6 +241,9 @@ class ZenithNode<T> {
 
   /// Permanently disposes this node, clearing all subscribers.
   ///
+  /// If [purgeZeroize] is `true` and this node's value implements [Zeroizable],
+  /// the value is zeroized before the node is marked disposed.
+  ///
   /// After disposal:
   /// - [value] and [invalidate] throw [StateError].
   /// - [set] is a safe no-op.
@@ -237,9 +251,16 @@ class ZenithNode<T> {
   ///
   /// Calling [dispose] on an already-disposed node is a safe no-op
   /// (idempotent).
-  void dispose() {
+  void dispose({bool purgeZeroize = false}) {
     if (_isDisposed) {
       return;
+    }
+
+    if (purgeZeroize) {
+      final val = _value;
+      if (val is Zeroizable) {
+        val.zeroize();
+      }
     }
 
     _isDisposed = true;

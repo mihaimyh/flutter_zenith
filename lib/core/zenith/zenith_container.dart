@@ -1,15 +1,31 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart' show debugPrint;
 
 import 'async_value.dart';
 import 'zenith_environment.dart';
 import 'zenith_key.dart';
 import 'zenith_node.dart';
+import 'zenith_zeroizable.dart';
 
 /// The key type used for node lookup in a [ZenithContainer].
 ///
 /// Can be a plain [String], a [ZenithKey<T>], or any [Object] with proper
 /// `==` and `hashCode` semantics.
 typedef NodeKey = Object;
+
+/// Thrown when a singleton lifetime registration attempts to directly
+/// resolve a scoped dependency from a child/scoped container.
+class ZenithCaptiveDependencyException implements Exception {
+  /// A human-readable description of the violation.
+  final String message;
+
+  /// Creates a [ZenithCaptiveDependencyException] with [message].
+  const ZenithCaptiveDependencyException(this.message);
+
+  @override
+  String toString() => 'ZenithCaptiveDependencyException: $message';
+}
 
 /// A scoped lifecycle handle for a single node's factory context.
 ///
@@ -145,10 +161,14 @@ class ZenithContainer {
   /// The active runtime environment for this container.
   final ZenithEnvironment environment;
 
+  /// Whether this container is bound to a scoped (non-singleton) lifetime.
+  final bool isScopedContainer;
+
   final Map<NodeKey, ZenithNode<dynamic>> _nodes =
       <NodeKey, ZenithNode<dynamic>>{};
   final Map<NodeKey, ZenithRef> _refs = <NodeKey, ZenithRef>{};
   final Set<ZenithRef> _activeRefs = <ZenithRef>{};
+  final Set<Zeroizable> _zeroizables = <Zeroizable>{};
   final Map<ZenithKey<dynamic>, Function> _overrides;
   bool _isDisposed = false;
 
@@ -165,6 +185,7 @@ class ZenithContainer {
   ZenithContainer({
     this.parent,
     this.environment = ZenithEnvironment.production,
+    this.isScopedContainer = false,
     List<ZenithOverride<dynamic>> overrides = const [],
     Map<ZenithEnvironment, List<ZenithOverride<dynamic>>> environmentOverrides =
         const {},
@@ -212,6 +233,8 @@ class ZenithContainer {
       throw StateError('Cannot create node in disposed ZenithContainer');
     }
 
+    _assertCaptiveDependencyAllowed(key);
+
     final existing = _nodes[key];
     if (existing != null) {
       return existing as ZenithNode<T>;
@@ -221,6 +244,9 @@ class ZenithContainer {
     _refs[key] = ref;
 
     final initialValue = factory(ref);
+    if (initialValue is Zeroizable) {
+      _zeroizables.add(initialValue);
+    }
     final node = ZenithNode<T>(initialValue);
     _nodes[key] = node;
     return node;
@@ -242,6 +268,8 @@ class ZenithContainer {
       throw StateError('Cannot create node in disposed ZenithContainer');
     }
 
+    _assertCaptiveDependencyAllowed(key);
+
     final existing = _nodes[key];
     if (existing != null) {
       return existing as ZenithNode<T>;
@@ -254,6 +282,9 @@ class ZenithContainer {
     _refs[key] = ref;
 
     final initialValue = effectiveFactory(ref);
+    if (initialValue is Zeroizable) {
+      _zeroizables.add(initialValue);
+    }
     final node = ZenithNode<T>(initialValue);
     _nodes[key] = node;
     return node;
@@ -264,12 +295,11 @@ class ZenithContainer {
   /// Does **not** fall back to [parent] — use [maybeReadKey] for
   /// hierarchical lookup.
   ZenithNode<T>? maybeNode<T>(NodeKey key) {
-    final local = _nodes[key];
-    if (local != null) {
-      return local as ZenithNode<T>;
+    if (_isDisposed) {
+      return null;
     }
-
-    return null;
+    _assertCaptiveDependencyAllowed(key);
+    return _nodes[key] as ZenithNode<T>?;
   }
 
   /// Type-safe optional node lookup that also checks parent containers.
@@ -338,17 +368,25 @@ class ZenithContainer {
     _nodes.clear();
   }
 
+  void _assertCaptiveDependencyAllowed(NodeKey key) {
+    if (isScopedContainer &&
+        Zone.current[#zenith_is_singleton_construction] == true) {
+      final keyLabel = key is ZenithKey ? key.name : key.toString();
+      throw ZenithCaptiveDependencyException(
+        'Captive dependency violation: A singleton is attempting to resolve scoped key "$keyLabel" from a scoped container.',
+      );
+    }
+  }
+
   /// Disposes this container, firing all `onDispose` callbacks and
   /// disposing all managed nodes.
   ///
-  /// After disposal:
-  /// - [isDisposed] returns `true`.
-  /// - [getOrCreateNode] and [getOrCreate] throw [StateError].
-  /// - [maybeNode] and [maybeReadKey] return `null`.
+  /// If [purgeZeroize] is `true`, all managed nodes and zeroizable objects
+  /// are zeroized before container references are cleared.
   ///
   /// Calling [dispose] on an already-disposed container is a safe no-op
   /// (idempotent).
-  void dispose() {
+  void dispose({bool purgeZeroize = false}) {
     if (_isDisposed) {
       return;
     }
@@ -360,7 +398,14 @@ class ZenithContainer {
     }
 
     for (final node in _nodes.values.toList(growable: false)) {
-      node.dispose();
+      node.dispose(purgeZeroize: purgeZeroize);
+    }
+
+    if (purgeZeroize) {
+      for (final zeroizable in _zeroizables) {
+        zeroizable.zeroize();
+      }
+      _zeroizables.clear();
     }
 
     _activeRefs.clear();

@@ -44,7 +44,8 @@ void main() {
       );
 
       var notifications = 0;
-      node.subscribe(_CountingSubscriber(() => notifications++));
+      final sub = _CountingSubscriber(() => notifications++);
+      node.subscribe(sub);
 
       node.set(-5);
 
