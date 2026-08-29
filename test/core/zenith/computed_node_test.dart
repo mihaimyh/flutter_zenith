@@ -117,5 +117,17 @@ void main() {
       expect(doubled.value, 6);
       expect(quadrupled.value, 12);
     });
+
+    test('detects cyclic dependencies and throws StateError', () {
+      ComputedNode<int>? nodeA;
+      ComputedNode<int>? nodeB;
+
+      final source = ZenithNode<int>(1);
+
+      nodeA = ComputedNode<int>(() => source.value + (nodeB?.value ?? 0));
+      nodeB = ComputedNode<int>(() => nodeA!.value + 1);
+
+      expect(() => source.set(2), throwsStateError);
+    });
   });
 }

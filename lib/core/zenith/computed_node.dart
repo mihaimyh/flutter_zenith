@@ -49,7 +49,17 @@ class ComputedNode<T> extends ZenithNode<T>
     }
   }
 
+  bool _isComputing = false;
+
   void _recompute() {
+    if (_isComputing) {
+      throw StateError(
+        'Cyclic computed node dependency detected: '
+        'A ComputedNode cannot depend on itself directly or indirectly.',
+      );
+    }
+
+    _isComputing = true;
     final previousObserver = ZenithZone.currentObserver;
     _nodesReadThisCompute.clear();
     _isCollectingDependencies = true;
@@ -58,29 +68,36 @@ class ComputedNode<T> extends ZenithNode<T>
     T newValue;
     try {
       newValue = _compute();
+
+      // Reconcile subscriptions: unsubscribe from nodes no longer read.
+      final stale = _trackedSources.difference(_nodesReadThisCompute);
+      for (final node in stale) {
+        node.unsubscribe(this);
+      }
+
+      _trackedSources
+        ..clear()
+        ..addAll(_nodesReadThisCompute);
+
+      // Update internal value and notify downstream subscribers if changed.
+      super.set(newValue);
     } finally {
+      _isComputing = false;
       _isCollectingDependencies = false;
       ZenithZone.currentObserver = previousObserver;
     }
-
-    // Reconcile subscriptions: unsubscribe from nodes no longer read.
-    final stale = _trackedSources.difference(_nodesReadThisCompute);
-    for (final node in stale) {
-      node.unsubscribe(this);
-    }
-
-    _trackedSources
-      ..clear()
-      ..addAll(_nodesReadThisCompute);
-
-    // Update internal value and notify downstream subscribers if changed.
-    super.set(newValue);
   }
 
   /// Called when any tracked source node changes.
   @override
   void onNodeChanged(ZenithNode<dynamic> node) {
     if (isDisposed) return;
+    if (_isComputing) {
+      throw StateError(
+        'Cyclic computed node dependency detected: '
+        'A ComputedNode cannot depend on itself directly or indirectly.',
+      );
+    }
     _recompute();
   }
 
