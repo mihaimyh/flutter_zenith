@@ -12,7 +12,7 @@ topics:
   - reactive
   - signals
 
-version: 0.5.0
+version: 0.6.0
 
 environment:
   sdk: ^3.12.2

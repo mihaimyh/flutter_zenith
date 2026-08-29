@@ -260,6 +260,33 @@ class ZenithContainer {
     invalidate(key);
   }
 
+  /// Resets all managed nodes and references in this container without
+  /// permanently disposing the container itself.
+  ///
+  /// Fires all `onDispose` callbacks on managed [ZenithRef]s, disposes all
+  /// managed [ZenithNode]s, and clears internal storage maps.
+  ///
+  /// Useful for in-place user logout or session teardown without replacing
+  /// the [ZenithContainer] instance.
+  ///
+  /// Safe to call on a disposed container (no-op).
+  void reset() {
+    if (_isDisposed) {
+      return;
+    }
+
+    for (final ref in _refs.values.toList(growable: false)) {
+      ref._dispose();
+    }
+
+    for (final node in _nodes.values.toList(growable: false)) {
+      node.dispose();
+    }
+
+    _refs.clear();
+    _nodes.clear();
+  }
+
   /// Disposes this container, firing all `onDispose` callbacks and
   /// disposing all managed nodes.
   ///

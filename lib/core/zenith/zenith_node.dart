@@ -1,5 +1,8 @@
 import 'package:flutter/foundation.dart' show debugPrint;
 
+import 'zenith_middleware.dart';
+import 'zenith_observer.dart';
+
 /// Interface for objects that want to be notified when a [ZenithNode] changes.
 ///
 /// Subscribers are held via [WeakReference] inside the node, so they will be
@@ -47,11 +50,13 @@ class ZenithNode<T> {
   T _value;
   bool _isDisposed = false;
   bool _isInvalidating = false;
+  final List<ZenithMiddleware<T>> _middleware;
   final Set<WeakReference<ZenithSubscriber>> _subscribers =
       <WeakReference<ZenithSubscriber>>{};
 
-  /// Creates a [ZenithNode] with the given initial [value].
-  ZenithNode(this._value);
+  /// Creates a [ZenithNode] with initial [value] and optional [middleware].
+  ZenithNode(this._value, {List<ZenithMiddleware<T>> middleware = const []})
+      : _middleware = List<ZenithMiddleware<T>>.unmodifiable(middleware);
 
   /// The current value held by this node.
   ///
@@ -110,12 +115,29 @@ class ZenithNode<T> {
       return;
     }
 
-    if (_value == newValue) {
+    T effectiveValue = newValue;
+    for (final mw in _middleware) {
+      final intercepted = mw.onWillSet(this, _value, effectiveValue);
+      if (intercepted == null) {
+        return; // Write canceled by middleware
+      }
+      effectiveValue = intercepted;
+    }
+
+    if (_value == effectiveValue) {
       return;
     }
 
-    _value = newValue;
+    final oldValue = _value;
+    _value = effectiveValue;
+
+    Zenith.observer?.onNodeMutated(this, oldValue, effectiveValue);
+
     notifySubscribers();
+
+    for (final mw in _middleware) {
+      mw.onDidSet(this, effectiveValue);
+    }
   }
 
   /// Adds [subscriber] to this node's listener set.

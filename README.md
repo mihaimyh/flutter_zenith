@@ -19,7 +19,14 @@ A high-performance, container-scoped state management and dependency injection e
 * **Concurrency & Isolate Guards:** `ref.runAsyncGuarded(node, task, strategy: ...)` solves race conditions between overlapping async calls (`droppable` for double-submit prevention, `restartable` for stale-response prevention), and `ref.runInIsolate(node, payload, heavyComputation)` offloads heavy synchronous work to a background `Isolate` without leaving the `AsyncValue` state machine.
 * **Zero Dependencies:** Pure Dart/Flutter framework implementation—no `build_runner`, code generation, or third-party packages required.
 
-### What Is New in 0.5.0
+### What Is New in 0.6.0
+
+* **In-Place Container Reset:** Added `container.reset()` to teardown all nodes and references in an existing container without destroying the container instance.
+* **Auth State Machine:** Added `AuthState<T>` (`AuthUnauthenticated`, `AuthAuthenticating`, `AuthAuthenticated<T>`, `AuthError`) with exhaustive pattern matching and boolean status getters.
+* **State Persistence:** Introduced `ZenithStorage` interface, `InMemoryStorage`, and `PersistedNode<T>` for auto-syncing state across app restarts.
+* **Node Middleware:** Added `ZenithMiddleware<T>` interceptor pipeline (`onWillSet`, `onDidSet`) for value sanitization, write blocking, and audit logging.
+
+### What Was New in 0.5.0
 
 * **`AsyncValue` Value Equality:** Implemented `==` and `hashCode` for `AsyncData`, `AsyncLoading`, and `AsyncError`. Re-setting identical async values now skips unnecessary subscriber notifications and widget rebuilds.
 * **Stream Integration:** Added `ref.watchStream(node, stream)` and `node.watch(ref, stream)` for auto-subscribing `Stream`s to `AsyncValue` nodes with automatic lifecycle teardown on scope disposal.

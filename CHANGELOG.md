@@ -1,3 +1,10 @@
+## 0.6.0
+
+* **In-Place Scope Reset:** Added `ZenithContainer.reset()` to clear all nodes and references in an existing container without destroying the container instance itself (ideal for multi-user logout).
+* **Authentication State Union:** Introduced `AuthState<T>` (`AuthUnauthenticated`, `AuthAuthenticating`, `AuthAuthenticated<T>`, `AuthError`) with exhaustive pattern matching and boolean status getters for router integration.
+* **State Persistence & Hydration:** Introduced `ZenithStorage` interface, built-in `InMemoryStorage`, and `PersistedNode<T>` with static constructors (`PersistedNode.string`, `PersistedNode.integer`, `PersistedNode.boolean`) for auto-restoring and auto-saving node state across app restarts.
+* **Node Middleware Pipeline:** Added `ZenithMiddleware<T>` interceptors (`onWillSet`, `onDidSet`) for value sanitization, validation, transformation, write blocking, and audit logging.
+
 ## 0.5.0
 
 * **`AsyncValue` Equality & Value-Deduplication:** Implemented `==` and `hashCode` for `AsyncData`, `AsyncLoading`, and `AsyncError`. Setting the same async state twice now skips unnecessary subscriber notifications and widget rebuilds.
