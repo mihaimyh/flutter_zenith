@@ -51,7 +51,9 @@ class _ExpenseDraftScreenState extends State<ExpenseDraftScreen> {
                     key: const Key('amount-field'),
                     initialValue: amount,
                     decoration: const InputDecoration(labelText: 'Amount'),
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
                     onChanged: _controller.updateAmount,
                   );
                 },
@@ -66,7 +68,10 @@ class _ExpenseDraftScreenState extends State<ExpenseDraftScreen> {
                     items: const [
                       DropdownMenuItem(value: 'Food', child: Text('Food')),
                       DropdownMenuItem(value: 'Travel', child: Text('Travel')),
-                      DropdownMenuItem(value: 'Utilities', child: Text('Utilities')),
+                      DropdownMenuItem(
+                        value: 'Utilities',
+                        child: Text('Utilities'),
+                      ),
                     ],
                     onChanged: (value) {
                       if (value != null) {

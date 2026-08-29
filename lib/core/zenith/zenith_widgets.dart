@@ -4,12 +4,39 @@ import 'zenith_container.dart';
 import 'zenith_key.dart';
 import 'zenith_node.dart';
 
+/// An [InheritedWidget] wrapper that binds a [ZenithContainer] to a subtree
+/// of the widget tree.
+///
+/// When the [container] is swapped (e.g., on user logout / session change),
+/// the old container is automatically disposed in [didUpdateWidget].
+/// When the scope is removed from the tree, the container is disposed in
+/// [dispose].
+///
+/// To force a clean container swap on session change, assign a distinct
+/// [ValueKey] to the [ZenithScope]:
+///
+/// ```dart
+/// ZenithScope(
+///   key: ValueKey(userId),
+///   container: container,
+///   child: const MyApp(),
+/// )
+/// ```
 class ZenithScope extends StatefulWidget {
+  /// The container to provide to descendant widgets.
   final ZenithContainer container;
+
+  /// The widget subtree that can access [container] via [ZenithScope.of].
   final Widget child;
 
+  /// Creates a [ZenithScope] that binds [container] to the [child] subtree.
   const ZenithScope({super.key, required this.container, required this.child});
 
+  /// Retrieves the nearest [ZenithContainer] from the widget tree.
+  ///
+  /// Throws an [AssertionError] in debug mode if:
+  /// - No [ZenithScope] exists above [context].
+  /// - The resolved container has already been disposed.
   static ZenithContainer of(BuildContext context) {
     final inherited = context
         .dependOnInheritedWidgetOfExactType<_ZenithScopeInherited>();
@@ -65,10 +92,42 @@ class _ZenithScopeInherited extends InheritedWidget {
   }
 }
 
+/// A widget that subscribes to [ZenithNode]s read inside its [builder]
+/// closure and surgically rebuilds only when those nodes change.
+///
+/// Dependencies are auto-tracked: any [ZenithNode.value] read during
+/// [builder] execution is subscribed to. On subsequent builds, stale
+/// subscriptions (nodes no longer read) are reconciled away.
+///
+/// ```dart
+/// ZenithBuilder(
+///   builder: (context) {
+///     final count = counterNode.value; // auto-subscribed
+///     return Text('Count: $count');
+///   },
+/// )
+/// ```
+///
+/// If the builder throws, [errorBuilder] is invoked (if provided) to render
+/// a fallback widget. If [errorBuilder] is not set, the error propagates
+/// normally.
 class ZenithBuilder extends StatefulWidget {
+  /// The builder function that reads [ZenithNode]s and returns a widget.
+  ///
+  /// Any [ZenithNode.value] accessed inside this closure is automatically
+  /// subscribed to — changes to those nodes trigger a rebuild of only this
+  /// widget.
   final Widget Function(BuildContext context) builder;
 
-  const ZenithBuilder({super.key, required this.builder});
+  /// Optional error handler invoked when [builder] throws an exception.
+  ///
+  /// If `null`, exceptions propagate normally. When provided, the widget
+  /// renders the result of [errorBuilder] instead of crashing.
+  final Widget Function(BuildContext context, Object error, StackTrace stack)?
+      errorBuilder;
+
+  /// Creates a [ZenithBuilder].
+  const ZenithBuilder({super.key, required this.builder, this.errorBuilder});
 
   @override
   State<ZenithBuilder> createState() => _ZenithBuilderState();
@@ -116,7 +175,13 @@ class _ZenithBuilderState extends State<ZenithBuilder>
     ZenithZone.currentObserver = this;
 
     try {
-      return widget.builder(context);
+      final result = widget.builder(context);
+      return result;
+    } catch (error, stack) {
+      if (widget.errorBuilder != null) {
+        return widget.errorBuilder!(context, error, stack);
+      }
+      rethrow;
     } finally {
       _isCollectingDependencies = false;
       ZenithZone.currentObserver = previousObserver;
@@ -142,6 +207,9 @@ extension ZenithContextX on BuildContext {
   ZenithContainer get container => ZenithScope.of(this);
 
   /// Type-safe helper to read or create a node using a [ZenithKey].
+  ///
+  /// Looks up [key] in the nearest [ZenithContainer] and creates the node
+  /// via [factory] if it doesn't already exist.
   ZenithNode<T> zenith<T>(
     ZenithKey<T> key,
     T Function(ZenithRef ref) factory,

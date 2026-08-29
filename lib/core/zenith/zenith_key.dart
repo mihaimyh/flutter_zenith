@@ -6,8 +6,10 @@ import 'zenith_container.dart';
 /// optional [name] label, so `ZenithKey<int>('count')` and
 /// `ZenithKey<String>('count')` never collide even though they share a name.
 class ZenithKey<T> {
+  /// An optional name label to disambiguate keys of the same type.
   final String name;
 
+  /// Creates a [ZenithKey], optionally with a [name] label.
   const ZenithKey([this.name = '']);
 
   @override
@@ -28,8 +30,12 @@ class ZenithKey<T> {
 /// [ZenithContainer.getOrCreate] to use [factory] instead of the factory
 /// passed at the call site whenever [key] is requested.
 class ZenithOverride<T> {
+  /// The key to override.
   final ZenithKey<T> key;
+
+  /// The replacement factory function.
   final T Function(ZenithRef ref) factory;
 
+  /// Creates a [ZenithOverride] that replaces the factory for [key].
   ZenithOverride(this.key, this.factory);
 }

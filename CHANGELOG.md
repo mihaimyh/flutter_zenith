@@ -1,3 +1,14 @@
+## 0.5.0
+
+* **`AsyncValue` Equality & Value-Deduplication:** Implemented `==` and `hashCode` for `AsyncData`, `AsyncLoading`, and `AsyncError`. Setting the same async state twice now skips unnecessary subscriber notifications and widget rebuilds.
+* **`AsyncValue` Convenience Helpers:** Added `maybeWhen`, `whenOrNull`, `hasData`, `requireValue`, and human-readable `toString()` methods.
+* **Stream Support:** Added `ZenithStreamX.watchStream(node, stream)` and `StreamNodeX.watch(ref, stream)` for auto-subscribing streams to `AsyncValue` nodes with automatic lifecycle cancellation on scope disposal.
+* **Computed / Derived Nodes:** Introduced `ComputedNode<T>` for reactive state derivation. Auto-tracks source node dependencies during evaluation and only re-notifies when the computed result changes.
+* **Granular Subscriptions (`ZenithSelector`):** Introduced `ZenithSelector<T, R>` widget for selecting derived sub-properties of a node without triggering rebuilds when unrelated parts of the node change.
+* **Framework Observer (`ZenithObserver`):** Added `ZenithObserver` and `ZenithLogObserver` for debugging node creation, mutation, and container lifecycle events.
+* **Widget Rebuild Error Handling:** Added `errorBuilder` parameter to `ZenithBuilder` for graceful error rendering when builder closures throw.
+* **Documentation & Metadata:** Comprehensive Dart doc coverage (`///`) across all public APIs and updated `pubspec.yaml` pub.dev metadata.
+
 ## 0.4.0
 
 * Added `ConcurrencyStrategy` (`concurrent`, `droppable`, `restartable`) and

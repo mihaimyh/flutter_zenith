@@ -19,7 +19,16 @@ A high-performance, container-scoped state management and dependency injection e
 * **Concurrency & Isolate Guards:** `ref.runAsyncGuarded(node, task, strategy: ...)` solves race conditions between overlapping async calls (`droppable` for double-submit prevention, `restartable` for stale-response prevention), and `ref.runInIsolate(node, payload, heavyComputation)` offloads heavy synchronous work to a background `Isolate` without leaving the `AsyncValue` state machine.
 * **Zero Dependencies:** Pure Dart/Flutter framework implementation—no `build_runner`, code generation, or third-party packages required.
 
-### What Is New in 0.4.0
+### What Is New in 0.5.0
+
+* **`AsyncValue` Value Equality:** Implemented `==` and `hashCode` for `AsyncData`, `AsyncLoading`, and `AsyncError`. Re-setting identical async values now skips unnecessary subscriber notifications and widget rebuilds.
+* **Stream Integration:** Added `ref.watchStream(node, stream)` and `node.watch(ref, stream)` for auto-subscribing `Stream`s to `AsyncValue` nodes with automatic lifecycle teardown on scope disposal.
+* **Computed Nodes:** Introduced `ComputedNode<T>` for derived state calculations with automatic source node dependency tracking and memoized invalidation.
+* **Granular Subscriptions:** Added `ZenithSelector<T, R>` widget for selecting derived properties from a node, preventing rebuilds when unrelated fields change.
+* **Framework Observer:** Added `ZenithObserver` and `ZenithLogObserver` for debugging node creation, mutations, and container disposal events.
+* **Builder Error Handling:** Added `errorBuilder` parameter to `ZenithBuilder` for graceful error rendering when builder closures throw.
+
+### What Was New in 0.4.0
 
 * Added `ConcurrencyStrategy` (`concurrent`, `droppable`, `restartable`) and
   `ZenithConcurrencyX.runAsyncGuarded(node, task, {strategy})`: guards
