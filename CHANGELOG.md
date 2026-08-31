@@ -1,3 +1,8 @@
+## 0.11.3 - Safe InheritedWidget Scope Resolution
+
+* **`ZenithScopeProvider` Safe Resolution:** Replaced `dependOnInheritedWidgetOfExactType` with `getInheritedWidgetOfExactType` in `of()` and `maybeOf()`, allowing scopes to be safely inspected from any widget lifecycle stage (such as `initState`, `didChangeDependencies`, callbacks, or route bridges) without triggering framework assertion errors.
+* **Modal Scope Bridge Hardening:** Enhanced `zenithShowModalBottomSheet` route tunneling to gracefully tunnel parent scopes without asserting when used outside a `ZenithScopeProvider` root.
+
 ## 0.11.2 - Native Soft-Fail Enhancements & Sanitized Diagnostics
 
 * **`ZenithNode.trySet`:** Added typed `bool trySet(T newValue)` returning `false` when called on disposed nodes without emitting debug warnings.
