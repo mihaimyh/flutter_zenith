@@ -23,7 +23,7 @@ class ZenithScopeProvider extends InheritedWidget {
   /// Asserts that a [ZenithScopeProvider] ancestor exists.
   static ZenithTenantScope of(BuildContext context) {
     final provider =
-        context.dependOnInheritedWidgetOfExactType<ZenithScopeProvider>();
+        context.getInheritedWidgetOfExactType<ZenithScopeProvider>();
     assert(
       provider != null,
       'No ZenithScopeProvider found in the widget tree.',
@@ -34,7 +34,7 @@ class ZenithScopeProvider extends InheritedWidget {
   /// Retrieves the nearest [ZenithTenantScope] from [context], or null if none exists.
   static ZenithTenantScope? maybeOf(BuildContext context) {
     return context
-        .dependOnInheritedWidgetOfExactType<ZenithScopeProvider>()
+        .getInheritedWidgetOfExactType<ZenithScopeProvider>()
         ?.scope;
   }
 
