@@ -1,6 +1,7 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_zenith/core/zenith/async_value.dart';
 import 'package:flutter_zenith/core/zenith/zenith_node.dart';
+import 'package:flutter_zenith/core/zenith/zenith_safe_rebuild.dart';
 
 import 'zenith_authorization_service.dart';
 import 'zenith_policy.dart';
@@ -75,6 +76,7 @@ class ZenithAuthorizeView extends StatefulWidget {
 }
 
 class _ZenithAuthorizeViewState extends State<ZenithAuthorizeView>
+    with ZenithSafeRebuild
     implements ZenithSubscriber {
   final Set<ZenithNode<dynamic>> _subscribedNodes = {};
   _PolicyState _policyState = _Evaluating();
@@ -139,8 +141,7 @@ class _ZenithAuthorizeViewState extends State<ZenithAuthorizeView>
 
   @override
   void onNodeChanged(ZenithNode<dynamic> node) {
-    if (!mounted) return;
-    setState(_evaluate);
+    zenithMarkNeedsBuild(_evaluate);
   }
 
   void _clearSubscriptions() {

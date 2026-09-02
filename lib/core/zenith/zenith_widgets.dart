@@ -3,6 +3,7 @@ import 'package:flutter/widgets.dart';
 import 'zenith_container.dart';
 import 'zenith_key.dart';
 import 'zenith_node.dart';
+import 'zenith_safe_rebuild.dart';
 
 /// An [InheritedWidget] wrapper that binds a [ZenithContainer] to a subtree
 /// of the widget tree.
@@ -81,16 +82,18 @@ class ZenithBuilder extends StatefulWidget {
 }
 
 class _ZenithBuilderState extends State<ZenithBuilder>
+    with ZenithSafeRebuild
     implements ZenithSubscriber, ZenithObserverTracker {
   final Set<ZenithNode<dynamic>> _observedNodes = <ZenithNode<dynamic>>{};
   final Set<ZenithNode<dynamic>> _nodesReadThisBuild = <ZenithNode<dynamic>>{};
   bool _isCollectingDependencies = false;
 
   @override
+  bool get zenithIsBuilding => _isCollectingDependencies;
+
+  @override
   void onNodeChanged(ZenithNode<dynamic> node) {
-    if (mounted) {
-      setState(() {});
-    }
+    zenithMarkNeedsBuild();
   }
 
   @override
@@ -280,6 +283,7 @@ class ZenithListener<T> extends StatefulWidget {
 }
 
 class _ZenithListenerState<T> extends State<ZenithListener<T>>
+    with ZenithSafeRebuild
     implements ZenithSubscriber {
   late T _previousValue;
 
@@ -302,11 +306,12 @@ class _ZenithListenerState<T> extends State<ZenithListener<T>>
 
   @override
   void onNodeChanged(ZenithNode<dynamic> node) {
-    if (mounted) {
+    zenithRunSafe(() {
+      if (!mounted) return;
       final currentValue = widget.node.value;
       widget.listener(context, _previousValue, currentValue);
       _previousValue = currentValue;
-    }
+    });
   }
 
   @override

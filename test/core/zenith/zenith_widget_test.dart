@@ -100,4 +100,44 @@ void main() {
       expect(find.text('Guest'), findsOneWidget);
     },
   );
+
+  testWidgets(
+    'writing a node during ZenithBuilder build does not throw',
+    (tester) async {
+      final triggerNode = ZenithNode<int>(0);
+      final summaryNode = ZenithNode<String>('idle');
+
+      await tester.pumpWidget(
+        Directionality(
+          textDirection: TextDirection.ltr,
+          child: Column(
+            children: [
+              ZenithBuilder(
+                builder: (context) {
+                  final trigger = triggerNode.value;
+                  summaryNode.set('n=$trigger');
+                  return Text('trigger:$trigger');
+                },
+              ),
+              ZenithBuilder(
+                builder: (context) => Text(summaryNode.value),
+              ),
+            ],
+          ),
+        ),
+      );
+
+      expect(tester.takeException(), isNull);
+      expect(find.text('trigger:0'), findsOneWidget);
+      expect(find.text('n=0'), findsOneWidget);
+
+      triggerNode.set(1);
+      await tester.pump();
+      await tester.pump();
+
+      expect(tester.takeException(), isNull);
+      expect(find.text('trigger:1'), findsOneWidget);
+      expect(find.text('n=1'), findsOneWidget);
+    },
+  );
 }

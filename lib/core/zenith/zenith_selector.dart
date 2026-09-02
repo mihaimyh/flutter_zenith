@@ -1,6 +1,7 @@
 import 'package:flutter/widgets.dart';
 
 import 'zenith_node.dart';
+import 'zenith_safe_rebuild.dart';
 
 /// A widget that rebuilds only when a selected portion of a [ZenithNode]'s
 /// value changes.
@@ -46,6 +47,7 @@ class ZenithSelector<T, R> extends StatefulWidget {
 }
 
 class _ZenithSelectorState<T, R> extends State<ZenithSelector<T, R>>
+    with ZenithSafeRebuild
     implements ZenithSubscriber {
   late R _selectedValue;
 
@@ -68,13 +70,15 @@ class _ZenithSelectorState<T, R> extends State<ZenithSelector<T, R>>
 
   @override
   void onNodeChanged(ZenithNode<dynamic> node) {
-    if (!mounted) return;
-    final newSelected = widget.selector(widget.node.value);
-    if (newSelected != _selectedValue) {
-      setState(() {
-        _selectedValue = newSelected;
-      });
-    }
+    zenithRunSafe(() {
+      if (!mounted) return;
+      final newSelected = widget.selector(widget.node.value);
+      if (newSelected != _selectedValue) {
+        setState(() {
+          _selectedValue = newSelected;
+        });
+      }
+    });
   }
 
   @override

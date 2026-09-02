@@ -16,6 +16,7 @@ export 'zenith_mutation.dart';
 export 'zenith_node.dart';
 export 'zenith_observer.dart';
 export 'zenith_resilience.dart';
+export 'zenith_safe_rebuild.dart';
 export 'zenith_selector.dart';
 export 'zenith_service.dart';
 export 'zenith_scope_guard.dart';

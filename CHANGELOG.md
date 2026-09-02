@@ -1,3 +1,8 @@
+## 0.11.4 - Deferred rebuilds during Flutter build/layout
+
+* **`ZenithSafeRebuild`:** `ZenithBuilder`, `ZenithSelector`, `ZenithListener`, and `ZenithAuthorizeView` no longer call `setState` synchronously when a node is written during another widget's `build` (or during layout/paint). Rebuilds and listener callbacks are coalesced onto a post-frame callback, preventing `setState() or markNeedsBuild() called during build`.
+* If the notifying `ZenithBuilder` is itself currently building, the extra rebuild is skipped — that frame already reads the new value.
+
 ## 0.11.3 - Safe InheritedWidget Scope Resolution
 
 * **`ZenithScopeProvider` Safe Resolution:** Replaced `dependOnInheritedWidgetOfExactType` with `getInheritedWidgetOfExactType` in `of()` and `maybeOf()`, allowing scopes to be safely inspected from any widget lifecycle stage (such as `initState`, `didChangeDependencies`, callbacks, or route bridges) without triggering framework assertion errors.
