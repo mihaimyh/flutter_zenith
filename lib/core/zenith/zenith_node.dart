@@ -114,7 +114,14 @@ class ZenithNode<T> {
   /// Sets the value of this node and notifies all active subscribers.
   ///
   /// If [newValue] is equal to the current value (via `==`), this is a
-  /// no-op and no notifications are sent.
+  /// **no-op**: the value is unchanged and **no subscribers are notified**.
+  /// That includes [AsyncData] / [AsyncLoading] / [AsyncError] when their
+  /// payloads compare equal (for example `AsyncData(sameUser)` twice).
+  ///
+  /// Do **not** re-[set] an equal value to kick side effects (resume a deferred
+  /// scope, re-run sync, refresh listeners). Use [invalidate] to force a
+  /// notification without changing the value, or model the signal on a
+  /// dedicated node / callback instead of piggybacking on identity state.
   ///
   /// If the node has been disposed, the call is silently ignored (a concise debug
   /// message is printed in debug mode). This soft-fail behavior prevents
@@ -223,9 +230,16 @@ class ZenithNode<T> {
 
   /// Forces a notification pass without changing the value.
   ///
-  /// Useful for signaling subscribers to re-read the current value (e.g.,
-  /// when a mutable object's internal state has changed without a new
-  /// reference being assigned).
+  /// Use this when subscribers must re-read the current value even though
+  /// [set] would be a no-op due to value equality — for example:
+  /// - a mutable object's fields changed without assigning a new reference
+  /// - an external gate flipped (migration unlock, policy refresh) while
+  ///   auth/`AsyncData` identity stayed the same
+  ///
+  /// Prefer a dedicated signal node or an explicit controller callback when
+  /// the event is not really “this node’s value changed”; [invalidate] is
+  /// the correct escape hatch when you intentionally want the same payload
+  /// to re-fire [ZenithSubscriber.onNodeChanged].
   ///
   /// Contains a re-entrancy guard: if [invalidate] is called recursively
   /// from within a notification callback, the nested call is a no-op. This

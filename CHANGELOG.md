@@ -1,3 +1,7 @@
+## Unreleased
+
+* **Docs:** Clarified that `ZenithNode.set` equality short-circuit means re-setting an equal `AsyncValue` (e.g. `AsyncData(sameUser)`) does **not** notify subscribers. Side-effect re-triggers should use `ZenithNode.invalidate()`, a dedicated signal node, or an explicit callback — documented on `ZenithNode.set` / `invalidate`, `AsyncValue`, and the README AI agent rules.
+
 ## 0.11.4 - Deferred rebuilds during Flutter build/layout
 
 * **`ZenithSafeRebuild`:** `ZenithBuilder`, `ZenithSelector`, `ZenithListener`, and `ZenithAuthorizeView` no longer call `setState` synchronously when a node is written during another widget's `build` (or during layout/paint). Rebuilds and listener callbacks are coalesced onto a post-frame callback, preventing `setState() or markNeedsBuild() called during build`.
@@ -104,7 +108,7 @@
 
 ## 0.5.0
 
-* **`AsyncValue` Equality & Value-Deduplication:** Implemented `==` and `hashCode` for `AsyncData`, `AsyncLoading`, and `AsyncError`. Setting the same async state twice now skips unnecessary subscriber notifications and widget rebuilds.
+* **`AsyncValue` Equality & Value-Deduplication:** Implemented `==` and `hashCode` for `AsyncData`, `AsyncLoading`, and `AsyncError`. Setting the same async state twice now skips unnecessary subscriber notifications and widget rebuilds. Use `ZenithNode.invalidate()` (not a duplicate `set`) when listeners must re-run without a value change.
 * **`AsyncValue` Convenience Helpers:** Added `maybeWhen`, `whenOrNull`, `hasData`, `requireValue`, and human-readable `toString()` methods.
 * **Stream Support:** Added `ZenithStreamX.watchStream(node, stream)` and `StreamNodeX.watch(ref, stream)` for auto-subscribing streams to `AsyncValue` nodes with automatic lifecycle cancellation on scope disposal.
 * **Computed / Derived Nodes:** Introduced `ComputedNode<T>` for reactive state derivation. Auto-tracks source node dependencies during evaluation and only re-notifies when the computed result changes.

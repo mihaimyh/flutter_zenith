@@ -14,6 +14,12 @@ import 'zenith_node.dart';
 /// Use [when] for exhaustive pattern matching, or the convenience getters
 /// [isLoading], [hasData], [hasError], [valueOrNull], and [requireValue]
 /// for quick checks.
+///
+/// **Equality:** all three variants implement value `==` / [hashCode].
+/// [ZenithNode.set] therefore skips notifications when you write an equal
+/// [AsyncValue] again (e.g. `AsyncData(sameUser)`). To re-notify listeners
+/// without changing the payload, call [ZenithNode.invalidate] — do not rely
+/// on a duplicate [ZenithNode.set].
 @immutable
 sealed class AsyncValue<T> {
   /// Creates an [AsyncValue].

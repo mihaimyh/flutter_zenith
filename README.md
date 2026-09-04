@@ -52,7 +52,7 @@ A high-performance, container-scoped state management and dependency injection e
 
 ### What Was New in 0.5.0
 
-* **`AsyncValue` Value Equality:** Implemented `==` and `hashCode` for `AsyncData`, `AsyncLoading`, and `AsyncError`. Re-setting identical async values now skips unnecessary subscriber notifications and widget rebuilds.
+* **`AsyncValue` Value Equality:** Implemented `==` and `hashCode` for `AsyncData`, `AsyncLoading`, and `AsyncError`. Re-setting identical async values now skips unnecessary subscriber notifications and widget rebuilds. To force a re-notify with the same payload, use `ZenithNode.invalidate()` (or a dedicated signal / callback) — never `set(AsyncData(sameValue))` as a side-effect trigger.
 * **Stream Integration:** Added `ref.watchStream(node, stream)` and `node.watch(ref, stream)` for auto-subscribing `Stream`s to `AsyncValue` nodes with automatic lifecycle teardown on scope disposal.
 * **Computed Nodes:** Introduced `ComputedNode<T>` for derived state calculations with automatic source node dependency tracking and memoized invalidation.
 * **Granular Subscriptions:** Added `ZenithSelector<T, R>` widget for selecting derived properties from a node, preventing rebuilds when unrelated fields change.
@@ -319,6 +319,7 @@ If you are an AI coding assistant (Cursor, Claude Code, Copilot, Devin, etc.) ge
 * **Use `ref.runInIsolate()` for heavy synchronous work:** Large JSON parsing, crypto, or other CPU-bound transforms that would jank the UI thread SHOULD run via `ref.runInIsolate(node, payload, heavyComputation)`, not directly inside `runAsync`/`runAsyncGuarded`. Keep `heavyComputation` free of closures over `ZenithRef`, `BuildContext`, or other non-sendable state.
 * **Manual guard as fallback:** If a helper isn't a good fit, checking `if (!ref.isMounted) return;` before mutation is still valid and supported.
 * **Node Mutation Checks:** Do NOT attempt to read a disposed `ZenithNode` (`.value` throws `StateError`). Always ensure node disposal is handled through `ZenithContainer.dispose()` or `ref.onDispose()`. Note that `ZenithNode.set()` itself is a safe no-op on a disposed node (it does not throw), but `ref.runAsync()`/`ref.set()` remain the preferred, self-guarding entry points.
+* **Equal `set` is not a signal:** `ZenithNode.set` short-circuits when `newValue == current` (including equal `AsyncData` / `AsyncLoading` / `AsyncError`). Do NOT re-set the same auth user / session payload to resume deferred work (scopes, sync, migration unlock). Use `node.invalidate()` to force `onNodeChanged`, or wire an explicit callback / dedicated signal node for the side effect.
 
 ```dart
 // ✅ CORRECT AI PATTERN:
