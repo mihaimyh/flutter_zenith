@@ -374,7 +374,7 @@ class ZenithContainer {
   /// the [ZenithContainer] instance.
   ///
   /// Safe to call on a disposed container (no-op).
-  void reset({bool purgeZeroize = false}) {
+  Future<void> reset({bool purgeZeroize = false}) async {
     if (_isDisposed) {
       return;
     }
@@ -390,6 +390,8 @@ class ZenithContainer {
     _activeRefs.clear();
     _refs.clear();
     _nodes.clear();
+    
+    await _cleanupFuture;
   }
 
   void _assertCaptiveDependencyAllowed(NodeKey key) {

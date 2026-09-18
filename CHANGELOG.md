@@ -1,3 +1,9 @@
+## 0.11.7
+
+* **Bug Fix:** Fixed a massive memory leak in `ZenithScopeManager.getOrCreateUserScope` where old base `ZenithTenantScope` containers were orphaned instead of disposed.
+* **Bug Fix:** Made `ZenithContainer.reset()` asynchronous, awaiting `_cleanupFuture` to prevent resource race conditions (like SQLite file lock errors) during fast user switching.
+* **Bug Fix:** Fixed a silent exception swallowing issue in `ZenithTenantScope.runGuarded` and `runWithToken` where unhandled task errors were dropped by `.catchError` instead of propagating.
+
 ## 0.11.6
 
 * Shortened `pubspec.yaml` description to satisfy pub.dev scoring character limits.

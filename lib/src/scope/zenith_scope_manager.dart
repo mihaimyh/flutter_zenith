@@ -156,8 +156,9 @@ class ZenithTenantScope {
         .then((_) {
           _activeTokens.remove(token);
         })
-        .catchError((_) {
+        .catchError((error, stackTrace) {
           _activeTokens.remove(token);
+          Error.throwWithStackTrace(error, stackTrace);
         });
   }
 
@@ -173,8 +174,9 @@ class ZenithTenantScope {
         .then((_) {
           _activeTokens.remove(token);
         })
-        .catchError((_) {
+        .catchError((error, stackTrace) {
           _activeTokens.remove(token);
+          Error.throwWithStackTrace(error, stackTrace);
         });
   }
 
@@ -358,6 +360,8 @@ class ZenithScopeManager {
     if (_scopes.containsKey(id)) {
       final existing = _scopes[id]!;
       if (existing is ZenithUserScope) return existing;
+      // Dispose the existing base scope to prevent a memory leak before replacing it
+      existing.dispose();
     }
     final scope = ZenithUserScope(id);
     _scopes[id] = scope;
