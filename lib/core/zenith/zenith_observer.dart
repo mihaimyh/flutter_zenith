@@ -1,5 +1,3 @@
-import 'package:flutter/foundation.dart' show debugPrint;
-
 import 'zenith_container.dart';
 import 'zenith_node.dart';
 
@@ -47,6 +45,10 @@ class Zenith {
   /// }
   /// ```
   static ZenithObserver? observer;
+
+  /// Global delegate for debug printing, allowing Zenith to log warnings
+  /// without depending on Flutter's `foundation.dart`.
+  static void Function(String message)? onDebugPrint;
 }
 
 /// A built-in [ZenithObserver] that logs all events via [debugPrint].
@@ -57,7 +59,7 @@ class ZenithLogObserver extends ZenithObserver {
   @override
   void onNodeCreated(ZenithContainer container, Object key, ZenithNode<dynamic> node) {
     assert(() {
-      debugPrint('[Zenith] Node created: key=$key');
+      Zenith.onDebugPrint?.call('[Zenith] Node created: key=$key');
       return true;
     }());
   }
@@ -65,7 +67,7 @@ class ZenithLogObserver extends ZenithObserver {
   @override
   void onNodeMutated(ZenithNode<dynamic> node, dynamic oldValue, dynamic newValue) {
     assert(() {
-      debugPrint('[Zenith] Node mutated: $oldValue → $newValue');
+      Zenith.onDebugPrint?.call('[Zenith] Node mutated: $oldValue → $newValue');
       return true;
     }());
   }
@@ -73,7 +75,7 @@ class ZenithLogObserver extends ZenithObserver {
   @override
   void onNodeDisposed(ZenithNode<dynamic> node) {
     assert(() {
-      debugPrint('[Zenith] Node disposed');
+      Zenith.onDebugPrint?.call('[Zenith] Node disposed');
       return true;
     }());
   }
@@ -81,7 +83,7 @@ class ZenithLogObserver extends ZenithObserver {
   @override
   void onContainerCreated(ZenithContainer container) {
     assert(() {
-      debugPrint('[Zenith] Container created');
+      Zenith.onDebugPrint?.call('[Zenith] Container created');
       return true;
     }());
   }
@@ -89,7 +91,7 @@ class ZenithLogObserver extends ZenithObserver {
   @override
   void onContainerDisposed(ZenithContainer container) {
     assert(() {
-      debugPrint('[Zenith] Container disposed');
+      Zenith.onDebugPrint?.call('[Zenith] Container disposed');
       return true;
     }());
   }

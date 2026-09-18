@@ -86,6 +86,7 @@ class _ZenithBuilderState extends State<ZenithBuilder>
     implements ZenithSubscriber, ZenithObserverTracker {
   final Set<ZenithNode<dynamic>> _observedNodes = <ZenithNode<dynamic>>{};
   final Set<ZenithNode<dynamic>> _nodesReadThisBuild = <ZenithNode<dynamic>>{};
+  final Map<ZenithNode<dynamic>, ZenithSubscription> _subscriptions = {};
   bool _isCollectingDependencies = false;
 
   @override
@@ -97,9 +98,19 @@ class _ZenithBuilderState extends State<ZenithBuilder>
   }
 
   @override
-  void onNodeRead(ZenithNode<dynamic> node) {
+  void onNodeRead(ZenithNode<dynamic> node, ZenithSubscription subscription) {
     if (_isCollectingDependencies) {
-      _nodesReadThisBuild.add(node);
+      if (_nodesReadThisBuild.add(node)) {
+        if (!_observedNodes.contains(node)) {
+          _subscriptions[node] = subscription;
+        } else {
+          subscription();
+        }
+      } else {
+        subscription();
+      }
+    } else {
+      subscription();
     }
   }
 
@@ -109,16 +120,12 @@ class _ZenithBuilderState extends State<ZenithBuilder>
         .toList(growable: false);
 
     for (final node in staleNodes) {
-      node.unsubscribe(this);
+      _subscriptions.remove(node)?.call();
     }
 
-    final newNodes = _nodesReadThisBuild
-        .where((node) => !_observedNodes.contains(node))
-        .toList(growable: false);
-
-    for (final node in newNodes) {
-      node.subscribe(this);
-    }
+    // newNodes were already subscribed during onNodeRead! 
+    // They are tracked in _nodesReadThisBuild.
+    // So we don't need to manually subscribe here.
 
     _observedNodes
       ..clear()
@@ -149,8 +156,8 @@ class _ZenithBuilderState extends State<ZenithBuilder>
 
   @override
   void dispose() {
-    for (final node in _observedNodes.toList(growable: false)) {
-      node.unsubscribe(this);
+    for (final node in _observedNodes) {
+      _subscriptions.remove(node)?.call();
     }
     _observedNodes.clear();
     _nodesReadThisBuild.clear();
@@ -211,7 +218,7 @@ mixin ZenithStateMixin<T extends StatefulWidget> on State<T> {
   /// Resolves the nearest [ZenithContainer] from the widget hierarchy.
   ZenithContainer get container => context.container;
 
-  final List<void Function()> _listeners = <void Function()>[];
+  final List<ZenithSubscription> _subscriptions = <ZenithSubscription>[];
 
   /// Listens to [node] and executes [listener] when its value changes,
   /// without triggering widget rebuilds. The listener is automatically removed on [dispose].
@@ -227,16 +234,16 @@ mixin ZenithStateMixin<T extends StatefulWidget> on State<T> {
         previousValue = currentValue;
       }
     });
-    node.subscribe(sub);
-    _listeners.add(() => node.unsubscribe(sub));
+    final handle = node.subscribe(sub);
+    _subscriptions.add(handle);
   }
 
   @override
   void dispose() {
-    for (final cleanup in _listeners) {
+    for (final cleanup in _subscriptions) {
       cleanup();
     }
-    _listeners.clear();
+    _subscriptions.clear();
     super.dispose();
   }
 }
@@ -286,21 +293,22 @@ class _ZenithListenerState<T> extends State<ZenithListener<T>>
     with ZenithSafeRebuild
     implements ZenithSubscriber {
   late T _previousValue;
+  ZenithSubscription? _subscription;
 
   @override
   void initState() {
     super.initState();
     _previousValue = widget.node.value;
-    widget.node.subscribe(this);
+    _subscription = widget.node.subscribe(this);
   }
 
   @override
   void didUpdateWidget(covariant ZenithListener<T> oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (!identical(oldWidget.node, widget.node)) {
-      oldWidget.node.unsubscribe(this);
+      _subscription?.call();
       _previousValue = widget.node.value;
-      widget.node.subscribe(this);
+      _subscription = widget.node.subscribe(this);
     }
   }
 
@@ -316,7 +324,7 @@ class _ZenithListenerState<T> extends State<ZenithListener<T>>
 
   @override
   void dispose() {
-    widget.node.unsubscribe(this);
+    _subscription?.call();
     super.dispose();
   }
 

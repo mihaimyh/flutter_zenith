@@ -1,3 +1,11 @@
+## 0.12.0
+
+* **Performance / Architecture:** Refactored `ZenithNode` subscriber collections to use an internal $O(1)$ doubly-linked list. `subscribe` now returns an opaque `ZenithSubscription` handle, completely eliminating linear scans for both addition and unsubscription.
+* **Architecture:** Decoupled `package:flutter/foundation.dart` (`debugPrint`) from the core framework. `ZenithNode` and `ZenithContainer` are now fully independent of `dart:ui`. A `Zenith.onDebugPrint` configurable global delegate was introduced in `zenith_observer.dart`.
+* **Bug Fix:** Fixed a major memory leak in `ZenithContainer` where a factory exception would strand a `ZenithRef` in `_activeRefs`, causing its `onDispose` callbacks to erroneously fire when the container tears down.
+* **Bug Fix:** Fixed an exception swallowing issue in `ZenithTenantScope.runGuarded` and `runWithToken` where synchronous exceptions were dropped. Exceptions now propagate to the unhandled Zone for crash reporters, whilst guaranteeing $O(1)$ token eviction.
+* **Breaking Change:** `ZenithObserverTracker.onNodeRead` signature changed to accept a `ZenithSubscription` handle.
+
 ## 0.11.7
 
 * **Bug Fix:** Fixed a massive memory leak in `ZenithScopeManager.getOrCreateUserScope` where old base `ZenithTenantScope` containers were orphaned instead of disposed.

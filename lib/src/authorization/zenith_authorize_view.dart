@@ -87,7 +87,7 @@ class ZenithAuthorizeView extends StatefulWidget {
 class _ZenithAuthorizeViewState extends State<ZenithAuthorizeView>
     with ZenithSafeRebuild
     implements ZenithSubscriber {
-  final Set<ZenithNode<dynamic>> _subscribedNodes = {};
+  final Map<ZenithNode<dynamic>, ZenithSubscription> _subscriptions = {};
   _PolicyState _policyState = _Evaluating();
 
   @override
@@ -126,8 +126,8 @@ class _ZenithAuthorizeViewState extends State<ZenithAuthorizeView>
   }
 
   void _subscribeToNode(ZenithNode<dynamic> node) {
-    if (_subscribedNodes.add(node)) {
-      node.subscribe(this);
+    if (!_subscriptions.containsKey(node)) {
+      _subscriptions[node] = node.subscribe(this);
     }
   }
 
@@ -137,10 +137,10 @@ class _ZenithAuthorizeViewState extends State<ZenithAuthorizeView>
   }
 
   void _clearSubscriptions() {
-    for (final node in _subscribedNodes) {
-      node.unsubscribe(this);
+    for (final cleanup in _subscriptions.values) {
+      cleanup();
     }
-    _subscribedNodes.clear();
+    _subscriptions.clear();
   }
 
   @override

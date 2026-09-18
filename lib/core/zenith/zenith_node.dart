@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart' show debugPrint;
 
 import 'zenith_middleware.dart';
 import 'zenith_observer.dart';
@@ -8,6 +7,15 @@ import 'zenith_zeroizable.dart';
 ///
 /// Subscribers are held via [WeakReference] inside the node, so they will be
 /// automatically collected by the GC if no other strong reference exists.
+typedef ZenithSubscription = void Function();
+
+class _SubscriberEntry {
+  final WeakReference<ZenithSubscriber> subscriber;
+  _SubscriberEntry? next;
+  _SubscriberEntry? prev;
+  _SubscriberEntry(this.subscriber);
+}
+
 abstract class ZenithSubscriber {
   /// Called when [node]'s value changes or it is invalidated.
   void onNodeChanged(ZenithNode<dynamic> node);
@@ -19,7 +27,7 @@ abstract class ZenithSubscriber {
 abstract class ZenithObserverTracker {
   /// Called when a [ZenithNode.value] getter is invoked while this tracker
   /// is the active [ZenithZone.currentObserver].
-  void onNodeRead(ZenithNode<dynamic> node);
+  void onNodeRead(ZenithNode<dynamic> node, ZenithSubscription subscription);
 }
 
 /// Global zone state for automatic dependency tracking.
@@ -52,8 +60,9 @@ class ZenithNode<T> {
   bool _isDisposed = false;
   bool _isInvalidating = false;
   final List<ZenithMiddleware<T>> _middleware;
-  final Set<WeakReference<ZenithSubscriber>> _subscribers =
-      <WeakReference<ZenithSubscriber>>{};
+  _SubscriberEntry? _head;
+  _SubscriberEntry? _tail;
+  int _subscriberCount = 0;
 
   /// Creates a [ZenithNode] with initial [value] and optional [middleware].
   ZenithNode(this._value, {List<ZenithMiddleware<T>> middleware = const []})
@@ -73,9 +82,10 @@ class ZenithNode<T> {
 
     final observer = ZenithZone.currentObserver;
     if (observer != null) {
-      subscribe(observer);
       if (observer case ZenithObserverTracker tracker) {
-        tracker.onNodeRead(this);
+        tracker.onNodeRead(this, subscribe(observer));
+      } else {
+        subscribe(observer);
       }
     }
 
@@ -99,7 +109,7 @@ class ZenithNode<T> {
   /// references that have not yet been pruned).
   ///
   /// Intended for debugging and testing only.
-  int get debugSubscriberCount => _subscribers.length;
+  int get debugSubscriberCount => _subscriberCount;
 
   /// Attempts to update the value of this node.
   ///
@@ -132,7 +142,7 @@ class ZenithNode<T> {
       // UI/scope is simply gone). Fail softly instead of throwing so callers
       // don't need to manually guard every post-await mutation.
       assert(() {
-        debugPrint(
+        Zenith.onDebugPrint?.call(
           'ZenithNode<$T>.set() ignored: node is disposed',
         );
         return true;
@@ -174,18 +184,40 @@ class ZenithNode<T> {
   /// identity — subscribing the same instance multiple times is a no-op.
   ///
   /// Throws [StateError] if the node has been disposed.
-  void subscribe(ZenithSubscriber subscriber) {
+  ZenithSubscription subscribe(ZenithSubscriber subscriber) {
     if (_isDisposed) {
       throw StateError('Cannot subscribe to a disposed ZenithNode');
     }
 
-    for (final weak in _subscribers) {
-      if (identical(weak.target, subscriber)) {
-        return;
-      }
+    final entry = _SubscriberEntry(WeakReference<ZenithSubscriber>(subscriber));
+    if (_tail == null) {
+      _head = _tail = entry;
+    } else {
+      _tail!.next = entry;
+      entry.prev = _tail;
+      _tail = entry;
     }
+    _subscriberCount++;
 
-    _subscribers.add(WeakReference<ZenithSubscriber>(subscriber));
+    bool isCancelled = false;
+    return () {
+      if (isCancelled || _isDisposed) return;
+      isCancelled = true;
+      
+      if (entry.prev != null) {
+        entry.prev!.next = entry.next;
+      } else {
+        _head = entry.next;
+      }
+      
+      if (entry.next != null) {
+        entry.next!.prev = entry.prev;
+      } else {
+        _tail = entry.prev;
+      }
+      
+      _subscriberCount--;
+    };
   }
 
   /// Removes [subscriber] from this node's listener set.
@@ -193,14 +225,25 @@ class ZenithNode<T> {
   /// Also prunes any dead weak references encountered during removal.
   /// Safe to call on a disposed node (no-op).
   void unsubscribe(ZenithSubscriber subscriber) {
-    if (_isDisposed) {
-      return;
+    if (_isDisposed) return;
+    var current = _head;
+    while (current != null) {
+      final next = current.next;
+      if (identical(current.subscriber.target, subscriber) || current.subscriber.target == null) {
+        if (current.prev != null) {
+          current.prev!.next = current.next;
+        } else {
+          _head = current.next;
+        }
+        if (current.next != null) {
+          current.next!.prev = current.prev;
+        } else {
+          _tail = current.prev;
+        }
+        _subscriberCount--;
+      }
+      current = next;
     }
-
-    _subscribers.removeWhere((weak) {
-      final target = weak.target;
-      return target == null || identical(target, subscriber);
-    });
   }
 
   /// Notifies all live subscribers that this node has changed.
@@ -209,23 +252,35 @@ class ZenithNode<T> {
   /// The listener list is snapshot-copied before iteration so that mutations
   /// to the subscriber set during callbacks are safe.
   void notifySubscribers() {
-    if (_isDisposed) {
-      return;
+    if (_isDisposed) return;
+
+    final listeners = <ZenithSubscriber>[];
+    var current = _head;
+    while (current != null) {
+      final next = current.next;
+      final target = current.subscriber.target;
+      if (target == null) {
+        // prune dead
+        if (current.prev != null) {
+          current.prev!.next = current.next;
+        } else {
+          _head = current.next;
+        }
+        if (current.next != null) {
+          current.next!.prev = current.prev;
+        } else {
+          _tail = current.prev;
+        }
+        _subscriberCount--;
+      } else {
+        listeners.add(target);
+      }
+      current = next;
     }
-
-    _subscribers.removeWhere((weak) => weak.target == null);
-
-    final listeners = List<ZenithSubscriber>.from(
-      _subscribers.map((weak) => weak.target).whereType<ZenithSubscriber>(),
-      growable: false,
-    );
 
     for (final listener in listeners) {
       listener.onNodeChanged(this);
     }
-
-    // Cleanup pass for listeners that were collected during notification.
-    _subscribers.removeWhere((weak) => weak.target == null);
   }
 
   /// Forces a notification pass without changing the value.
@@ -288,6 +343,8 @@ class ZenithNode<T> {
     }
 
     _isDisposed = true;
-    _subscribers.clear();
+    _head = null;
+    _tail = null;
+    _subscriberCount = 0;
   }
 }

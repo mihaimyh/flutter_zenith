@@ -50,20 +50,21 @@ class _ZenithSelectorState<T, R> extends State<ZenithSelector<T, R>>
     with ZenithSafeRebuild
     implements ZenithSubscriber {
   late R _selectedValue;
+  ZenithSubscription? _subscription;
 
   @override
   void initState() {
     super.initState();
     _selectedValue = widget.selector(widget.node.value);
-    widget.node.subscribe(this);
+    _subscription = widget.node.subscribe(this);
   }
 
   @override
   void didUpdateWidget(covariant ZenithSelector<T, R> oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (!identical(oldWidget.node, widget.node)) {
-      oldWidget.node.unsubscribe(this);
-      widget.node.subscribe(this);
+      _subscription?.call();
+      _subscription = widget.node.subscribe(this);
     }
     _selectedValue = widget.selector(widget.node.value);
   }
@@ -88,7 +89,7 @@ class _ZenithSelectorState<T, R> extends State<ZenithSelector<T, R>>
 
   @override
   void dispose() {
-    widget.node.unsubscribe(this);
+    _subscription?.call();
     super.dispose();
   }
 }

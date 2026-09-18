@@ -152,14 +152,9 @@ class ZenithTenantScope {
     final token = ZenithCancellationToken();
     _activeTokens.add(token);
 
-    task()
-        .then((_) {
-          _activeTokens.remove(token);
-        })
-        .catchError((error, stackTrace) {
-          _activeTokens.remove(token);
-          Error.throwWithStackTrace(error, stackTrace);
-        });
+    Future.sync(task).whenComplete(() {
+      _activeTokens.remove(token);
+    });
   }
 
   /// Runs [task] providing a [ZenithCancellationToken] that is cancelled when
@@ -170,14 +165,9 @@ class ZenithTenantScope {
     final token = ZenithCancellationToken();
     _activeTokens.add(token);
 
-    task(token)
-        .then((_) {
-          _activeTokens.remove(token);
-        })
-        .catchError((error, stackTrace) {
-          _activeTokens.remove(token);
-          Error.throwWithStackTrace(error, stackTrace);
-        });
+    Future.sync(() => task(token)).whenComplete(() {
+      _activeTokens.remove(token);
+    });
   }
 
   /// Listens for [ZenithInvalidateMessage]s on an IsolateNameServer port.

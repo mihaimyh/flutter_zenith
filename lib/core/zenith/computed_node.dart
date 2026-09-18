@@ -28,10 +28,9 @@ class ComputedNode<T> extends ZenithNode<T>
     implements ZenithSubscriber, ZenithObserverTracker {
   final T Function() _compute;
 
-  /// The set of source nodes that were read during the last computation.
   final Set<ZenithNode<dynamic>> _trackedSources = <ZenithNode<dynamic>>{};
-  final Set<ZenithNode<dynamic>> _nodesReadThisCompute =
-      <ZenithNode<dynamic>>{};
+  final Set<ZenithNode<dynamic>> _nodesReadThisCompute = <ZenithNode<dynamic>>{};
+  final Map<ZenithNode<dynamic>, ZenithSubscription> _subscriptions = {};
   bool _isCollectingDependencies = false;
 
   /// Creates a [ComputedNode] that derives its value from [compute].
@@ -43,9 +42,19 @@ class ComputedNode<T> extends ZenithNode<T>
   }
 
   @override
-  void onNodeRead(ZenithNode<dynamic> node) {
+  void onNodeRead(ZenithNode<dynamic> node, ZenithSubscription subscription) {
     if (_isCollectingDependencies) {
-      _nodesReadThisCompute.add(node);
+      if (_nodesReadThisCompute.add(node)) {
+        if (!_trackedSources.contains(node)) {
+           _subscriptions[node] = subscription;
+        } else {
+           subscription(); // Already tracked from previous build, cancel duplicate
+        }
+      } else {
+        subscription(); // Duplicate in same build
+      }
+    } else {
+      subscription();
     }
   }
 
@@ -72,7 +81,7 @@ class ComputedNode<T> extends ZenithNode<T>
       // Reconcile subscriptions: unsubscribe from nodes no longer read.
       final stale = _trackedSources.difference(_nodesReadThisCompute);
       for (final node in stale) {
-        node.unsubscribe(this);
+        _subscriptions.remove(node)?.call();
       }
 
       _trackedSources
@@ -112,8 +121,8 @@ class ComputedNode<T> extends ZenithNode<T>
 
   @override
   void dispose({bool purgeZeroize = false}) {
-    for (final node in _trackedSources.toList(growable: false)) {
-      node.unsubscribe(this);
+    for (final node in _trackedSources) {
+      _subscriptions.remove(node)?.call();
     }
     _trackedSources.clear();
     _nodesReadThisCompute.clear();

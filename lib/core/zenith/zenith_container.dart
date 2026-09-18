@@ -1,11 +1,10 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart' show debugPrint;
-
 import 'async_value.dart';
 import 'zenith_environment.dart';
 import 'zenith_key.dart';
 import 'zenith_node.dart';
+import 'zenith_observer.dart';
 
 /// The key type used for node lookup in a [ZenithContainer].
 ///
@@ -129,7 +128,7 @@ class ZenithRef {
         callback();
       } catch (error, stackTrace) {
         assert(() {
-          debugPrint(
+          Zenith.onDebugPrint?.call(
             'ZenithRef onDispose callback threw during teardown: $error\n$stackTrace',
           );
           return true;
@@ -271,7 +270,15 @@ class ZenithContainer {
     final ref = ZenithRef(this);
     _refs[key] = ref;
 
-    final initialValue = factory(ref);
+    final initialValue;
+    try {
+      initialValue = factory(ref);
+    } catch (_) {
+      _activeRefs.remove(ref);
+      _refs.remove(key);
+      rethrow;
+    }
+    
     final node = ZenithNode<T>(initialValue);
     _nodes[key] = node;
     return node;
@@ -306,7 +313,15 @@ class ZenithContainer {
     final ref = ZenithRef(this);
     _refs[key] = ref;
 
-    final initialValue = effectiveFactory(ref);
+    final initialValue;
+    try {
+      initialValue = effectiveFactory(ref);
+    } catch (_) {
+      _activeRefs.remove(ref);
+      _refs.remove(key);
+      rethrow;
+    }
+    
     final node = ZenithNode<T>(initialValue);
     _nodes[key] = node;
     return node;

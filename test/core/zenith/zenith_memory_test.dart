@@ -8,15 +8,20 @@ class _NoopSubscriber implements ZenithSubscriber {
 
 void main() {
   group('Zenith weak-reference behavior', () {
-    test('subscribe deduplicates the same subscriber instance', () {
+    test('subscribe returns opaque handles that decrement subscriber count', () {
       final node = ZenithNode<int>(0);
       final subscriber = _NoopSubscriber();
 
-      node.subscribe(subscriber);
-      node.subscribe(subscriber);
-      node.subscribe(subscriber);
+      final handle1 = node.subscribe(subscriber);
+      final handle2 = node.subscribe(subscriber);
 
+      expect(node.debugSubscriberCount, 2);
+
+      handle1();
       expect(node.debugSubscriberCount, 1);
+
+      handle2();
+      expect(node.debugSubscriberCount, 0);
     });
 
     test('dead weak references are cleaned during notify pass', () async {
