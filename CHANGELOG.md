@@ -1,3 +1,7 @@
+## 0.11.6
+
+* Shortened `pubspec.yaml` description to satisfy pub.dev scoring character limits.
+
 ## 0.11.5
 
 * Fixed the production audit findings with regression and edge-case tests. Authorization now fails closed, identity transitions reject stale work, outbox flushes are serialized, persistence writes are ordered, and resource teardown awaits asynchronous cleanup.

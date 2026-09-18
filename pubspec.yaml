@@ -1,8 +1,7 @@
 name: flutter_zenith
 description: >-
-  A high-performance, container-scoped state management and dependency injection
-  engine for Flutter. Zero-dependency, surgical rendering, async lifecycle
-  guards, and type-safe DI — all in one package.
+  Container-scoped state management and dependency injection engine for
+  Flutter. Features surgical rendering, async lifecycle guards, and type-safe DI.
 repository: https://github.com/mihaimyh/flutter_zenith
 homepage: https://github.com/mihaimyh/flutter_zenith
 issue_tracker: https://github.com/mihaimyh/flutter_zenith/issues
@@ -12,7 +11,7 @@ topics:
   - reactive
   - signals
 
-version: 0.11.5
+version: 0.11.6
 
 environment:
   sdk: ^3.12.2
