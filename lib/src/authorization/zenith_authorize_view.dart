@@ -5,6 +5,7 @@ import 'package:flutter_zenith/core/zenith/zenith_safe_rebuild.dart';
 
 import 'zenith_authorization_service.dart';
 import 'zenith_policy.dart';
+import 'zenith_requirement.dart';
 
 /// A declarative Flutter widget that shows different UI depending on whether
 /// a [ZenithPolicy] grants access.
@@ -34,6 +35,9 @@ class ZenithAuthorizeView extends StatefulWidget {
   /// The policy to evaluate.
   final ZenithPolicy policy;
 
+  /// Claims used by requirement policies. Defaults to an anonymous context.
+  final UserSecurityContext securityContext;
+
   /// Creates a [ZenithAuthorizeView].
   const ZenithAuthorizeView({
     super.key,
@@ -41,16 +45,19 @@ class ZenithAuthorizeView extends StatefulWidget {
     required this.authorized,
     required this.notAuthorized,
     this.authorizing,
+    this.securityContext = const UserSecurityContext(),
   });
 
   /// A [ZenithAuthorizeView] that hides the [authorized] widget when denied
   /// (renders [SizedBox.shrink] instead of calling [notAuthorized]).
   factory ZenithAuthorizeView.hidden({
     required ZenithPolicy policy,
+    UserSecurityContext securityContext = const UserSecurityContext(),
     required Widget Function(BuildContext) authorized,
   }) {
     return ZenithAuthorizeView(
       policy: policy,
+      securityContext: securityContext,
       authorized: authorized,
       notAuthorized: (_, _) => const SizedBox.shrink(),
     );
@@ -59,11 +66,13 @@ class ZenithAuthorizeView extends StatefulWidget {
   /// A [ZenithAuthorizeView] that shows a locked icon/overlay when denied.
   factory ZenithAuthorizeView.locked({
     required ZenithPolicy policy,
+    UserSecurityContext securityContext = const UserSecurityContext(),
     required Widget Function(BuildContext) authorized,
     Widget Function(BuildContext, AuthorizationResult)? notAuthorized,
   }) {
     return ZenithAuthorizeView(
       policy: policy,
+      securityContext: securityContext,
       authorized: authorized,
       notAuthorized:
           notAuthorized ??
@@ -95,30 +104,13 @@ class _ZenithAuthorizeViewState extends State<ZenithAuthorizeView>
 
   void _evaluate() {
     _clearSubscriptions();
-    final policy = widget.policy;
-
-    // Async policy path.
-    final asyncEval = policy.evaluateAsync;
-    if (asyncEval != null) {
-      final ref = _ReactiveRef(onNodeRead: _subscribeToNode);
-      final result = asyncEval(ref);
-      _setFromAsync(result);
-      return;
-    }
-
-    // Sync lambda path.
-    final syncEval = policy.evaluate;
-    if (syncEval != null) {
-      final ref = _ReactiveRef(onNodeRead: _subscribeToNode);
-      final granted = syncEval(ref);
-      _policyState = granted
-          ? _Authorized()
-          : _Denied(const AuthorizationResult(isAuthorized: false));
-      return;
-    }
-
-    // Requirements list — no reactive nodes.
-    _policyState = _Authorized();
+    _setFromAsync(
+      const ZenithAuthorizationService().evaluateState(
+        widget.securityContext,
+        widget.policy,
+        ref: _ReactiveRef(onNodeRead: _subscribeToNode),
+      ),
+    );
   }
 
   void _setFromAsync(AsyncValue<bool> value) {

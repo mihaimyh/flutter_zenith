@@ -62,7 +62,8 @@ class ZenithPartitionedStorage {
   /// Creates a [ZenithPartitionedStorage] for [tenantId] backed by [driver].
   ZenithPartitionedStorage({required this.driver, required this.tenantId});
 
-  String _namespace(String key) => 'tenants/$tenantId/$key';
+  String _namespace(String key) =>
+      'tenants/${Uri.encodeComponent(tenantId)}/${Uri.encodeComponent(key)}';
 
   /// Reads the value for [key] scoped to this tenant, or `null` if absent.
   Future<String?> read(String key) => driver.read(_namespace(key));

@@ -50,7 +50,7 @@ class ZenithMediator {
   final Map<Type, List<Function>> _eventHandlers = <Type, List<Function>>{};
   final List<ZenithPipelineBehavior> _behaviors = <ZenithPipelineBehavior>[];
 
-  int _callDepth = 0;
+  final Object _depthKey = Object();
   static const int maxCallDepth = 10;
 
   /// Creates a [ZenithMediator] bound to [container].
@@ -80,7 +80,8 @@ class ZenithMediator {
   /// Passes through all registered [ZenithPipelineBehavior]s in registration order.
   /// Throws [StateError] if no handler is registered or if re-entrancy depth exceeds 10.
   Future<R> send<R>(ZenithCommand<R> command) async {
-    if (_callDepth >= maxCallDepth) {
+    final depth = Zone.current[_depthKey] as int? ?? 0;
+    if (depth >= maxCallDepth) {
       throw StateError(
         'ZenithMediator re-entrancy depth limit ($maxCallDepth) exceeded. '
         'Check for recursive command calls (e.g. Command A sending Command A).',
@@ -95,9 +96,7 @@ class ZenithMediator {
       );
     }
 
-    _callDepth++;
-
-    try {
+    return runZoned(() async {
       final ref = ZenithRef(container);
 
       Future<R> executePipeline(int index) async {
@@ -116,9 +115,7 @@ class ZenithMediator {
       }
 
       return await executePipeline(0);
-    } finally {
-      _callDepth--;
-    }
+    }, zoneValues: {_depthKey: depth + 1});
   }
 
   /// Publishes [event] to all registered 1-to-Many event handlers.

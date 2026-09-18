@@ -6,7 +6,6 @@ import 'async_value.dart';
 import 'zenith_environment.dart';
 import 'zenith_key.dart';
 import 'zenith_node.dart';
-import 'zenith_zeroizable.dart';
 
 /// The key type used for node lookup in a [ZenithContainer].
 ///
@@ -47,6 +46,16 @@ class ZenithRef {
 
   bool _isMounted = true;
   final List<void Function()> _onDisposeCallbacks = <void Function()>[];
+  final List<Future<void> Function()> _asyncDisposeCallbacks = [];
+
+  /// Registers awaited resource cleanup. See [ZenithContainer.disposeAsync].
+  void onDisposeAsync(Future<void> Function() callback) {
+    if (!_isMounted) {
+      container._trackCleanup(Future<void>.sync(callback));
+    } else {
+      _asyncDisposeCallbacks.add(callback);
+    }
+  }
 
   /// Creates a [ZenithRef] bound to [container].
   ZenithRef(this.container) {
@@ -129,6 +138,11 @@ class ZenithRef {
     }
 
     _onDisposeCallbacks.clear();
+    final cleanup = List.of(_asyncDisposeCallbacks);
+    _asyncDisposeCallbacks.clear();
+    for (final callback in cleanup) {
+      container._trackCleanup(Future<void>.sync(callback));
+    }
   }
 }
 
@@ -168,9 +182,23 @@ class ZenithContainer {
       <NodeKey, ZenithNode<dynamic>>{};
   final Map<NodeKey, ZenithRef> _refs = <NodeKey, ZenithRef>{};
   final Set<ZenithRef> _activeRefs = <ZenithRef>{};
-  final Set<Zeroizable> _zeroizables = <Zeroizable>{};
   final Map<ZenithKey<dynamic>, Function> _overrides;
   bool _isDisposed = false;
+  Future<void> _cleanupFuture = Future.value();
+
+  /// Completion of asynchronous cleanup initiated by reset/dispose.
+  Future<void> get disposalComplete => _cleanupFuture;
+
+  void _trackCleanup(Future<void> cleanup) {
+    _cleanupFuture = Future.wait([_cleanupFuture, cleanup]).then((_) {});
+    _cleanupFuture.ignore();
+  }
+
+  /// Disposes synchronously, then awaits all registered asynchronous cleanup.
+  Future<void> disposeAsync({bool purgeZeroize = false}) {
+    dispose(purgeZeroize: purgeZeroize);
+    return _cleanupFuture;
+  }
 
   void _registerRef(ZenithRef ref) {
     if (_isDisposed) {
@@ -199,7 +227,7 @@ class ZenithContainer {
     required List<ZenithOverride<dynamic>> overrides,
     required ZenithEnvironment environment,
     required Map<ZenithEnvironment, List<ZenithOverride<dynamic>>>
-        environmentOverrides,
+    environmentOverrides,
   }) {
     final map = <ZenithKey<dynamic>, Function>{};
     for (final override in overrides) {
@@ -244,9 +272,6 @@ class ZenithContainer {
     _refs[key] = ref;
 
     final initialValue = factory(ref);
-    if (initialValue is Zeroizable) {
-      _zeroizables.add(initialValue);
-    }
     final node = ZenithNode<T>(initialValue);
     _nodes[key] = node;
     return node;
@@ -282,9 +307,6 @@ class ZenithContainer {
     _refs[key] = ref;
 
     final initialValue = effectiveFactory(ref);
-    if (initialValue is Zeroizable) {
-      _zeroizables.add(initialValue);
-    }
     final node = ZenithNode<T>(initialValue);
     _nodes[key] = node;
     return node;
@@ -346,11 +368,13 @@ class ZenithContainer {
   /// Fires all `onDispose` callbacks on managed [ZenithRef]s, disposes all
   /// managed [ZenithNode]s, and clears internal storage maps.
   ///
+  /// Set [purgeZeroize] to wipe current secure values before releasing them.
+  ///
   /// Useful for in-place user logout or session teardown without replacing
   /// the [ZenithContainer] instance.
   ///
   /// Safe to call on a disposed container (no-op).
-  void reset() {
+  void reset({bool purgeZeroize = false}) {
     if (_isDisposed) {
       return;
     }
@@ -360,7 +384,7 @@ class ZenithContainer {
     }
 
     for (final node in _nodes.values.toList(growable: false)) {
-      node.dispose();
+      node.dispose(purgeZeroize: purgeZeroize);
     }
 
     _activeRefs.clear();
@@ -399,13 +423,6 @@ class ZenithContainer {
 
     for (final node in _nodes.values.toList(growable: false)) {
       node.dispose(purgeZeroize: purgeZeroize);
-    }
-
-    if (purgeZeroize) {
-      for (final zeroizable in _zeroizables) {
-        zeroizable.zeroize();
-      }
-      _zeroizables.clear();
     }
 
     _activeRefs.clear();

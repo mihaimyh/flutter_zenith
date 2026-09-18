@@ -19,6 +19,7 @@ class ZenithUserScope extends ZenithTenantScope {
 
   /// Returns the existing workspace scope for [workspaceId], or creates one.
   ZenithTenantScope getOrCreateWorkspaceScope(String workspaceId) {
+    if (isDisposed || isClosing) throw StateError('User scope is closing');
     return _workspaces.putIfAbsent(
       workspaceId,
       () => ZenithTenantScope(workspaceId),
@@ -49,10 +50,25 @@ class ZenithUserScope extends ZenithTenantScope {
   }
 
   @override
+  Future<void> drainOwnedScopes({
+    required Duration timeout,
+    required bool purgeZeroize,
+  }) async {
+    await Future.wait(
+      List.of(_workspaces.values).map(
+        (scope) =>
+            scope.drainAndDispose(timeout: timeout, purgeZeroize: purgeZeroize),
+      ),
+    );
+  }
+
+  @override
   void dispose({bool purgeZeroize = false}) {
+    if (isDisposed) return;
     // Dispose all child workspaces first.
     for (final ws in List.of(_workspaces.values)) {
       ws.dispose(purgeZeroize: purgeZeroize);
+      onDisposeAsync(() => ws.disposalComplete);
     }
     _workspaces.clear();
     super.dispose(purgeZeroize: purgeZeroize);

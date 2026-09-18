@@ -25,10 +25,13 @@ class ZenithAuthScope extends StatefulWidget {
 
   /// Builder rendered when the coordinator is in any authenticated state.
   final Widget Function(BuildContext context, ZenithTenantScope scope)
-      authenticatedBuilder;
+  authenticatedBuilder;
 
   /// Builder rendered when the coordinator is [AuthUnauthenticated].
   final Widget Function(BuildContext context) unauthenticatedBuilder;
+
+  /// UI shown during biometric lock. Defaults to an empty widget.
+  final Widget Function(BuildContext context)? lockedBuilder;
 
   /// Creates a [ZenithAuthScope].
   const ZenithAuthScope({
@@ -36,6 +39,7 @@ class ZenithAuthScope extends StatefulWidget {
     required this.coordinator,
     required this.authenticatedBuilder,
     required this.unauthenticatedBuilder,
+    this.lockedBuilder,
   });
 
   @override
@@ -79,8 +83,8 @@ class _ZenithAuthScopeState extends State<ZenithAuthScope> {
     final newScope = widget.coordinator.currentScope;
 
     if (!identical(newState, _lastState) || !identical(newScope, _lastScope)) {
-      final wasAuthenticated = _lastState != null &&
-          _lastState is! AuthUnauthenticated;
+      final wasAuthenticated =
+          _lastState != null && _lastState is! AuthUnauthenticated;
       final isNowUnauthenticated = newState is AuthUnauthenticated;
 
       if (wasAuthenticated && isNowUnauthenticated) {
@@ -110,6 +114,10 @@ class _ZenithAuthScopeState extends State<ZenithAuthScope> {
   Widget build(BuildContext context) {
     final state = _state;
     final scope = _scope;
+
+    if (state is AuthLocked) {
+      return widget.lockedBuilder?.call(context) ?? const SizedBox.shrink();
+    }
 
     if (state is AuthUnauthenticated) {
       return widget.unauthenticatedBuilder(context);

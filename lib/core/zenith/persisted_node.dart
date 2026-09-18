@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart' show debugPrint;
+import 'dart:async';
 
 import 'zenith_node.dart';
 import 'zenith_storage.dart';
@@ -17,6 +17,18 @@ import 'zenith_storage.dart';
 /// themeNode.set('dark');  // Mutates node & asynchronously writes to storage
 /// ```
 class PersistedNode<T> extends ZenithNode<T> {
+  static final _writes = Expando<Map<String, Future<void>>>();
+  Future<void> _lastWrite = Future.value();
+  Object? _persistenceError;
+  int _generation = 0;
+
+  /// Latest write/serialization failure, cleared after a successful write.
+  Object? get persistenceError => _persistenceError;
+
+  /// Awaits this node's latest accepted write and propagates its failure.
+  /// Call before ending a scope when durability is required.
+  Future<void> flush() => _lastWrite;
+
   /// The key used for storage lookup.
   final String key;
 
@@ -102,21 +114,35 @@ class PersistedNode<T> extends ZenithNode<T> {
 
   @override
   void set(T newValue) {
+    if (isDisposed) return;
     final oldValue = value;
+    if (oldValue == newValue) return;
+    final generation = ++_generation;
     super.set(newValue);
-
-    // If the value changed and node is not disposed, write to storage.
-    if (value != oldValue && !isDisposed) {
-      try {
-        storage.write(key, toStorage(newValue));
-      } catch (error, stackTrace) {
-        assert(() {
-          debugPrint(
-            'PersistedNode storage write failed for key "$key": $error\n$stackTrace',
-          );
-          return true;
-        }());
-      }
+    // A subscriber may dispose this node or synchronously write a newer value.
+    if (isDisposed || generation != _generation || value == oldValue) return;
+    try {
+      final serialized = toStorage(value);
+      final pending = _writes[storage] ??= {};
+      final previous = pending[key] ?? Future<void>.value();
+      final write = previous
+          .then<void>((_) {}, onError: (Object _, StackTrace _) {})
+          .then((_) => storage.write(key, serialized));
+      pending[key] = write;
+      _lastWrite = write;
+      write.then(
+        (_) {
+          if (generation == _generation) _persistenceError = null;
+          if (identical(pending[key], write)) pending.remove(key);
+        },
+        onError: (Object error, StackTrace stack) {
+          if (generation == _generation) _persistenceError = error;
+          if (identical(pending[key], write)) pending.remove(key);
+        },
+      );
+    } catch (error, stack) {
+      _persistenceError = error;
+      _lastWrite = Future<void>.error(error, stack)..ignore();
     }
   }
 }

@@ -64,8 +64,8 @@ class _ZenithSelectorState<T, R> extends State<ZenithSelector<T, R>>
     if (!identical(oldWidget.node, widget.node)) {
       oldWidget.node.unsubscribe(this);
       widget.node.subscribe(this);
-      _selectedValue = widget.selector(widget.node.value);
     }
+    _selectedValue = widget.selector(widget.node.value);
   }
 
   @override

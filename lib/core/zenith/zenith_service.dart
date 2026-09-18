@@ -32,17 +32,70 @@ abstract class ZenithService {
   Future<void> onStop() async {}
 }
 
-/// Extension on [ZenithRef] providing background service lifecycle registration.
+/// Observable startup and shutdown for a registered service.
+class ZenithServiceRegistration {
+  final ZenithService _service;
+  final Completer<void> _started = Completer<void>();
+  final Completer<void> _stopped = Completer<void>();
+  bool _startupFinished = false;
+  bool _stopRequested = false;
+
+  /// Most recent lifecycle failure, also exposed by [started] or [stopped].
+  Object? lastError;
+
+  /// Completes when startup succeeds, or throws its error.
+  Future<void> get started => _started.future;
+
+  /// Completes after requested shutdown, or throws its error.
+  Future<void> get stopped => _stopped.future;
+
+  ZenithServiceRegistration._(this._service, ZenithRef ref) {
+    started.ignore();
+    stopped.ignore();
+    Future<void>.sync(() => _service.onStart(ref)).then(
+      (_) {
+        _startupFinished = true;
+        _started.complete();
+      },
+      onError: (Object error, StackTrace stack) {
+        _startupFinished = true;
+        lastError = error;
+        _started.completeError(error, stack);
+        stop().ignore();
+      },
+    );
+  }
+
+  /// Stops once; if startup is pending, waits before releasing its resources.
+  Future<void> stop() {
+    if (_stopRequested) return stopped;
+    _stopRequested = true;
+    final cleanup = _startupFinished
+        ? Future<void>.sync(_service.onStop)
+        : started
+              .then<void>((_) {}, onError: (Object _, StackTrace _) {})
+              .then((_) => _service.onStop());
+    cleanup.then(
+      (_) => _stopped.complete(),
+      onError: (Object error, StackTrace stack) {
+        lastError = error;
+        _stopped.completeError(error, stack);
+      },
+    );
+    return stopped;
+  }
+}
+
+/// Service registration bound to a ref's asynchronous cleanup.
 extension ZenithServiceRefX on ZenithRef {
-  /// Registers [service] with this ref's scope.
-  ///
-  /// Immediately invokes [ZenithService.onStart] and hooks [ZenithService.onStop]
-  /// to run automatically when this scope is disposed or reset.
-  void registerService(ZenithService service) {
-    service.onStart(this);
-    onDispose(() {
-      service.onStop();
-    });
+  /// Starts a service and returns observable lifecycle completion.
+  ZenithServiceRegistration registerService(ZenithService service) {
+    if (!isMounted) {
+      throw StateError('Cannot start a service on a disposed ref');
+    }
+    final registration = ZenithServiceRegistration._(service, this);
+    onDisposeAsync(registration.stop);
+    return registration;
   }
 }
 
@@ -57,6 +110,11 @@ class ZenithPeriodicService extends ZenithService {
   /// The async task callback executed on every tick.
   final Future<void> Function(ZenithRef ref) task;
 
+  Future<void>? _inFlight;
+
+  /// Most recent periodic task error. Task failures do not escape the timer.
+  Object? lastError;
+
   Timer? _timer;
   ZenithRef? _ref;
 
@@ -69,8 +127,19 @@ class ZenithPeriodicService extends ZenithService {
     _timer?.cancel();
     _timer = Timer.periodic(interval, (_) {
       final currentRef = _ref;
-      if (currentRef != null && currentRef.isMounted) {
-        task(currentRef);
+      if (currentRef != null && currentRef.isMounted && _inFlight == null) {
+        _inFlight = Future<void>.sync(() => task(currentRef))
+            .then(
+              (_) {
+                lastError = null;
+              },
+              onError: (Object error, StackTrace _) {
+                lastError = error;
+              },
+            )
+            .whenComplete(() {
+              _inFlight = null;
+            });
       }
     });
   }
@@ -80,6 +149,7 @@ class ZenithPeriodicService extends ZenithService {
     _timer?.cancel();
     _timer = null;
     _ref = null;
+    await _inFlight;
   }
 }
 
@@ -113,7 +183,10 @@ class ZenithIsolateService<T, R> extends ZenithService {
       }
     });
 
-    final spawnedIsolate = await Isolate.spawn(entryPoint, _receivePort!.sendPort);
+    final spawnedIsolate = await Isolate.spawn(
+      entryPoint,
+      _receivePort!.sendPort,
+    );
     if (_receivePort == null) {
       // Scope was disposed while Isolate.spawn was awaiting in flight
       spawnedIsolate.kill(priority: Isolate.immediate);

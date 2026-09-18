@@ -1,5 +1,8 @@
 # flutter_zenith
 
+For the identity, storage and lifecycle API changes in the next release, see
+[audit fixes and migration notes](docs/audit-fixes.md).
+
 [![Flutter](https://img.shields.io/badge/Flutter-3.25%2B-02569B?logo=flutter)](https://flutter.dev)
 [![Dart](https://img.shields.io/badge/Dart-3.5%2B-0175C2?logo=dart)](https://dart.dev)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)

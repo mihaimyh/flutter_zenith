@@ -47,19 +47,37 @@ class ZenithTenantScope {
   IpcListenerEntry? _ipcListener;
 
   bool _isDisposed = false;
+  bool _isClosing = false;
+  Future<void>? _drainFuture;
+  Future<void> _disposalComplete = Future.value();
+  final List<Future<void> Function()> _asyncDisposeCallbacks = [];
+
+  /// Whether teardown has begun. New scoped work is rejected while closing.
+  bool get isClosing => _isClosing;
+
+  /// Completion and errors of asynchronous cleanup started by [dispose].
+  Future<void> get disposalComplete => _disposalComplete;
+
+  /// Registers resource cleanup that [drainAndDispose] will await.
+  /// After disposal, await the returned [disposalComplete] for cleanup errors.
+  void onDisposeAsync(Future<void> Function() callback) {
+    if (_isDisposed) throw StateError('Scope is disposed');
+    _asyncDisposeCallbacks.add(callback);
+  }
+
   bool _isDormant = false;
 
   /// Creates a [ZenithTenantScope] with [id] and a fresh [ZenithContainer].
   ZenithTenantScope(this.id)
-      : container = ZenithContainer(isScopedContainer: id != '__app__');
+    : container = ZenithContainer(isScopedContainer: id != '__app__');
 
   /// Whether this scope has been disposed.
   bool get isDisposed => _isDisposed;
 
   /// Whether this scope is dormant (biometric lock active).
   ///
-  /// While dormant the container remains open for instant unlock, but the scope
-  /// is paused for UI mutations.
+  /// Dormancy is an identity/UI signal, not a lock on direct node writes.
+  /// The container stays open so background state can remain current.
   bool get isDormant => _isDormant;
 
   /// Puts this scope into dormant (biometric-locked) state.
@@ -70,7 +88,7 @@ class ZenithTenantScope {
 
   /// Registers [drainable] to be awaited during two-phase scope teardown.
   void registerDrainable(ZenithDrainable drainable) {
-    if (_isDisposed) return;
+    if (_isDisposed || _isClosing) throw StateError('Scope is closing');
     _drainables.add(drainable);
   }
 
@@ -94,7 +112,7 @@ class ZenithTenantScope {
     T Function() factory, {
     ZenithLifetime lifetime = ZenithLifetime.scoped,
   }) {
-    if (_isDisposed) {
+    if (_isDisposed || _isClosing) {
       throw StateError('Cannot register in a disposed ZenithTenantScope');
     }
 
@@ -129,32 +147,35 @@ class ZenithTenantScope {
   /// before [task] completes, the token is cancelled, stopping any registered
   /// `onCancel` callbacks (e.g. aborting HTTP requests).
   void runGuarded(Future<void> Function() task) {
-    if (_isDisposed) return;
+    if (_isDisposed || _isClosing) return;
 
     final token = ZenithCancellationToken();
     _activeTokens.add(token);
 
-    task().then((_) {
-      _activeTokens.remove(token);
-    }).catchError((_) {
-      _activeTokens.remove(token);
-    });
+    task()
+        .then((_) {
+          _activeTokens.remove(token);
+        })
+        .catchError((_) {
+          _activeTokens.remove(token);
+        });
   }
 
   /// Runs [task] providing a [ZenithCancellationToken] that is cancelled when
   /// this scope is disposed.
-  void runWithToken(
-      Future<void> Function(ZenithCancellationToken token) task) {
-    if (_isDisposed) return;
+  void runWithToken(Future<void> Function(ZenithCancellationToken token) task) {
+    if (_isDisposed || _isClosing) return;
 
     final token = ZenithCancellationToken();
     _activeTokens.add(token);
 
-    task(token).then((_) {
-      _activeTokens.remove(token);
-    }).catchError((_) {
-      _activeTokens.remove(token);
-    });
+    task(token)
+        .then((_) {
+          _activeTokens.remove(token);
+        })
+        .catchError((_) {
+          _activeTokens.remove(token);
+        });
   }
 
   /// Listens for [ZenithInvalidateMessage]s on an IsolateNameServer port.
@@ -174,6 +195,7 @@ class ZenithTenantScope {
   void dispose({bool purgeZeroize = false}) {
     if (_isDisposed) return;
     _isDisposed = true;
+    _isClosing = true;
 
     // Cancel all in-flight guarded tasks.
     for (final token in List.of(_activeTokens)) {
@@ -195,22 +217,63 @@ class ZenithTenantScope {
 
     // Dispose the container (and zeroize secure nodes if requested).
     container.dispose(purgeZeroize: purgeZeroize);
+    _drainables.clear();
+    final cleanup = List.of(_asyncDisposeCallbacks);
+    _asyncDisposeCallbacks.clear();
+    _disposalComplete = Future.wait([
+      container.disposalComplete,
+      ...cleanup.map((cb) => Future<void>.sync(cb)),
+    ]).then((_) {});
+    // Synchronous dispose is best-effort; callers can await disposalComplete.
+    _disposalComplete.ignore();
   }
 
   /// Awaits all registered [ZenithDrainable]s then calls [dispose].
   Future<void> drainAndDispose({
     Duration timeout = const Duration(milliseconds: 500),
     bool purgeZeroize = false,
-  }) async {
-    if (_isDisposed) return;
+  }) {
+    if (_drainFuture != null) return _drainFuture!;
+    if (_isDisposed) return _disposalComplete;
+    _isClosing = true;
+    final completion = Completer<void>();
+    _drainFuture = completion.future;
+    _drain(
+      timeout,
+      purgeZeroize,
+    ).then(completion.complete, onError: completion.completeError);
+    return completion.future;
+  }
 
-    if (_drainables.isNotEmpty) {
-      await Future.wait(_drainables.map((d) => d.drain()))
-          .timeout(timeout, onTimeout: () => []);
+  /// Override to drain currently owned child scopes before disposal.
+  Future<void> drainOwnedScopes({
+    required Duration timeout,
+    required bool purgeZeroize,
+  }) async {}
+
+  Future<void> _drain(Duration timeout, bool purgeZeroize) async {
+    Object? failure;
+    StackTrace? failureStack;
+    try {
+      await Future.wait([
+        ...List.of(_drainables).map((d) => Future<void>.sync(d.drain)),
+        Future<void>.sync(
+          () => drainOwnedScopes(timeout: timeout, purgeZeroize: purgeZeroize),
+        ),
+      ]).timeout(timeout, onTimeout: () => []);
+    } catch (error, stack) {
+      failure = error;
+      failureStack = stack;
+    } finally {
+      dispose(purgeZeroize: purgeZeroize);
+      try {
+        await _disposalComplete;
+      } catch (error, stack) {
+        failure ??= error;
+        failureStack ??= stack;
+      }
     }
-    _drainables.clear();
-
-    dispose(purgeZeroize: purgeZeroize);
+    if (failure != null) Error.throwWithStackTrace(failure, failureStack!);
   }
 }
 
@@ -280,6 +343,7 @@ class ZenithScopeManager {
   final ZenithTenantScope appScope = ZenithTenantScope('__app__');
 
   final Map<String, ZenithTenantScope> _scopes = {};
+  final Map<String, Future<void>> _ending = {};
 
   /// Returns whether a scope with [id] is currently active.
   bool hasScope(String id) => _scopes.containsKey(id);
@@ -314,8 +378,19 @@ class ZenithScopeManager {
     bool purgeZeroize = false,
   }) async {
     final scope = _scopes.remove(id);
-    if (scope != null) {
-      await scope.drainAndDispose(timeout: timeout, purgeZeroize: purgeZeroize);
+    if (scope == null) {
+      await _ending[id];
+      return;
+    }
+    final ending = scope.drainAndDispose(
+      timeout: timeout,
+      purgeZeroize: purgeZeroize,
+    );
+    _ending[id] = ending;
+    try {
+      await ending;
+    } finally {
+      if (identical(_ending[id], ending)) _ending.remove(id);
     }
   }
 

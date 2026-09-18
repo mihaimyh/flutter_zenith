@@ -1,3 +1,4 @@
+import '../../core/zenith/async_value.dart';
 import 'zenith_policy.dart';
 import 'zenith_requirement.dart';
 
@@ -13,7 +14,8 @@ class AuthorizationResult {
   const AuthorizationResult({required this.isAuthorized, this.reason});
 
   @override
-  String toString() => 'AuthorizationResult(isAuthorized: $isAuthorized'
+  String toString() =>
+      'AuthorizationResult(isAuthorized: $isAuthorized'
       '${reason != null ? ", reason: $reason" : ""})';
 }
 
@@ -28,40 +30,42 @@ class ZenithAuthorizationService {
   /// Creates a [ZenithAuthorizationService].
   const ZenithAuthorizationService();
 
-  /// Evaluates [policy] against [context], returning an [AuthorizationResult].
-  ///
-  /// Evaluation order:
-  /// 1. If [policy.requirements] is provided, all must return `true`.
-  /// 2. If [policy.evaluate] is provided, it must return `true`.
-  /// 3. If neither is provided and [policy.evaluateAsync] is set, returns
-  ///    `authorized = true` (async evaluation is handled by the widget layer).
+  /// All supplied conditions must pass. Empty or throwing policies deny access.
+  /// Async loading and error states never grant access.
   AuthorizationResult evaluate(
     UserSecurityContext context,
     ZenithPolicy policy,
   ) {
-    // Evaluate synchronous requirements list.
-    final reqs = policy.requirements;
-    if (reqs != null && reqs.isNotEmpty) {
-      for (final req in reqs) {
-        if (!req.evaluate(context)) {
-          return AuthorizationResult(
-            isAuthorized: false,
-            reason: 'Requirement ${req.runtimeType} not satisfied.',
-          );
-        }
+    final state = evaluateState(context, policy);
+    return AuthorizationResult(
+      isAuthorized: state is AsyncData<bool> && state.value,
+      reason: state is AsyncLoading<bool> ? 'Pending async evaluation' : null,
+    );
+  }
+
+  /// Shared evaluation for route guards and reactive authorization widgets.
+  AsyncValue<bool> evaluateState(
+    UserSecurityContext context,
+    ZenithPolicy policy, {
+    PolicyRef? ref,
+  }) {
+    final requirements = policy.requirements ?? const <ZenithRequirement>[];
+    if (requirements.isEmpty &&
+        policy.evaluate == null &&
+        policy.evaluateAsync == null) {
+      return const AsyncData(false);
+    }
+    try {
+      for (final requirement in requirements) {
+        if (!requirement.evaluate(context)) return const AsyncData(false);
       }
-      return const AuthorizationResult(isAuthorized: true);
+      final policyRef = ref ?? PolicyRef();
+      if (policy.evaluate != null && !policy.evaluate!(policyRef)) {
+        return const AsyncData(false);
+      }
+      return policy.evaluateAsync?.call(policyRef) ?? const AsyncData(true);
+    } catch (_) {
+      return const AsyncData(false);
     }
-
-    // Evaluate sync lambda.
-    final evalFn = policy.evaluate;
-    if (evalFn != null) {
-      final ref = PolicyRef();
-      final result = evalFn(ref);
-      return AuthorizationResult(isAuthorized: result);
-    }
-
-    // Async policy — authorization deferred to widget layer.
-    return const AuthorizationResult(isAuthorized: false, reason: 'Pending async evaluation');
   }
 }

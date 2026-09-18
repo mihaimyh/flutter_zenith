@@ -1,4 +1,9 @@
-## Unreleased
+## 0.11.5
+
+* Fixed the production audit findings with regression and edge-case tests. Authorization now fails closed, identity transitions reject stale work, outbox flushes are serialized, persistence writes are ordered, and resource teardown awaits asynchronous cleanup.
+* Object sessions require an explicit tenant ID. Production database pools require an `openHandle` factory. Encoded storage keys and database paths may require migration. See [migration notes](docs/audit-fixes.md).
+* Added observable service startup/shutdown, a separate locked UI builder, stable outbox mutation IDs, and secure-value purging on reset. Fixed parallel mediator calls and selector configuration changes.
+* Replaced repeated outbox list removal with constant-time removal and removed retained historical secure-value references.
 
 * **Docs:** Clarified that `ZenithNode.set` equality short-circuit means re-setting an equal `AsyncValue` (e.g. `AsyncData(sameUser)`) does **not** notify subscribers. Side-effect re-triggers should use `ZenithNode.invalidate()`, a dedicated signal node, or an explicit callback — documented on `ZenithNode.set` / `invalidate`, `AsyncValue`, and the README AI agent rules.
 

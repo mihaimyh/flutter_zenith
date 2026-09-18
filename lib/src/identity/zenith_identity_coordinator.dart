@@ -6,7 +6,8 @@ import 'zenith_identity_auth_state.dart';
 /// Thrown when an anonymous-to-authenticated migration fails.
 ///
 /// The [ZenithIdentityCoordinator] guarantees that if [ZenithMigrationException]
-/// is thrown, the anonymous scope and state are preserved intact.
+/// is thrown, the anonymous state is restored unless a newer identity
+/// transition has superseded the migration.
 class ZenithMigrationException implements Exception {
   /// The underlying cause of the migration failure.
   final Object cause;
@@ -52,6 +53,25 @@ class ZenithIdentityCoordinator {
 
   ZenithAuthState _state = AuthUnauthenticated();
   ZenithTenantScope? _currentScope;
+  ZenithTenantScope? _migrationScope;
+  int _generation = 0;
+  Future<void>? _signOutFuture;
+
+  String _identity(Object? session, String? tenantId) {
+    final id = tenantId ?? (session is String ? session : null);
+    if (id == null || id.isEmpty) {
+      throw ArgumentError('Provide a non-empty tenantId for object sessions.');
+    }
+    return id;
+  }
+
+  Future<void> _cancelMigration() {
+    final pending = _migrationScope;
+    _migrationScope = null;
+    return pending == null
+        ? Future.value()
+        : _manager.endScopeAsync(pending.id);
+  }
 
   final List<void Function(RevocationReason reason)> _revocationListeners = [];
   final List<void Function()> _listeners = [];
@@ -85,33 +105,64 @@ class ZenithIdentityCoordinator {
 
   // ─── Authentication Transitions ────────────────────────────────────────────
 
-  /// Signs in with a fully authenticated [session] token.
-  Future<void> signIn<T>(T session) async {
-    final id = session.toString();
+  /// Signs in using an explicit stable tenant ID. String sessions may be used
+  /// directly as IDs for compatibility; objects must supply [tenantId].
+  Future<void> signIn<T>(T session, {String? tenantId}) async {
+    final id = _identity(session, tenantId);
+    _generation++;
+    final cleanup = _cancelMigration();
+    final old = _currentScope;
+    final retirement = old != null && old.id != id
+        ? _manager.endScopeAsync(old.id)
+        : Future<void>.value();
     _currentScope = _manager.getOrCreateScope(id);
+    _currentScope!.markActive();
     _state = AuthAuthenticated<T>(session);
     _notifyListeners();
+    await Future.wait([cleanup, retirement]);
   }
 
-  /// Signs in as an anonymous guest with [anonId].
+  /// Signs in as an anonymous guest and retires the prior identity.
   Future<void> signInAnonymously({required String anonId}) async {
+    _identity(anonId, null);
+    _generation++;
+    final cleanup = _cancelMigration();
+    final old = _currentScope;
+    final retirement = old != null && old.id != anonId
+        ? _manager.endScopeAsync(old.id)
+        : Future<void>.value();
     _currentScope = _manager.getOrCreateScope(anonId);
+    _currentScope!.markActive();
     _state = AuthAnonymous(anonId);
     _notifyListeners();
+    await Future.wait([cleanup, retirement]);
   }
 
-  /// Signs out: destroys the current scope and resets to [AuthUnauthenticated].
+  /// Clears identity immediately and awaits pending resource teardown.
   Future<void> signOut() async {
+    if (_currentScope == null &&
+        _migrationScope == null &&
+        _signOutFuture != null) {
+      await _signOutFuture;
+      return;
+    }
+    _generation++;
+    final cleanup = _cancelMigration();
     final scope = _currentScope;
     _currentScope = null;
     _state = AuthUnauthenticated();
+    final retirement = scope == null
+        ? Future<void>.value()
+        : _manager.endScopeAsync(scope.id);
+    final completion = Future.wait([cleanup, retirement]).then<void>((_) {});
+    _signOutFuture = completion;
     _notifyListeners();
-    if (scope != null) {
-      _manager.endScope(scope.id);
+    try {
+      await completion;
+    } finally {
+      if (identical(_signOutFuture, completion)) _signOutFuture = null;
     }
   }
-
-  // ─── Anonymous → Authenticated Migration ───────────────────────────────────
 
   /// Upgrades an anonymous session to a fully authenticated one.
   ///
@@ -124,6 +175,7 @@ class ZenithIdentityCoordinator {
   /// [AuthAuthenticated].
   Future<void> upgradeAnonymousAccount<T>({
     required T newSession,
+    String? tenantId,
     required Future<void> Function(
       ZenithContainer fromContainer,
       ZenithContainer toContainer,
@@ -131,35 +183,43 @@ class ZenithIdentityCoordinator {
     onMigrate,
   }) async {
     final anonScope = _currentScope;
-    if (anonScope == null) {
-      throw StateError('No current scope to migrate from.');
+    if (anonScope == null || _state is! AuthAnonymous) {
+      throw StateError('Migration requires an anonymous session.');
     }
-
     final fromId = anonScope.id;
-    final toId = newSession.toString();
-
-    _state = AuthMigrating(fromId, toId);
-
+    final toId = _identity(newSession, tenantId);
+    if (toId == fromId || _manager.hasScope(toId)) {
+      throw ArgumentError('Migration requires a distinct, unused tenant ID.');
+    }
+    final generation = ++_generation;
     final toScope = _manager.getOrCreateScope(toId);
-
+    _migrationScope = toScope;
+    _state = AuthMigrating(fromId, toId);
+    _notifyListeners();
+    if (generation != _generation) return;
     try {
       await onMigrate(anonScope.container, toScope.container);
-    } catch (e, st) {
-      // Migration failed: tear down the new scope and restore anonymous state.
-      _manager.endScope(toId);
-      _currentScope = anonScope;
-      _state = AuthAnonymous(fromId);
-      throw ZenithMigrationException(e, st);
+    } catch (error, stack) {
+      if (generation == _generation) {
+        _migrationScope = null;
+        final cleanup = _manager.endScopeAsync(toId);
+        _state = AuthAnonymous(fromId);
+        _notifyListeners();
+        // Cleanup must not replace the original migration error.
+        try {
+          await cleanup;
+        } catch (_) {}
+      }
+      throw ZenithMigrationException(error, stack);
     }
-
-    // Migration succeeded: retire the anonymous scope.
-    _manager.endScope(fromId);
+    if (generation != _generation) return;
+    _migrationScope = null;
+    final cleanup = _manager.endScopeAsync(fromId);
     _currentScope = toScope;
     _state = AuthAuthenticated<T>(newSession);
     _notifyListeners();
+    await cleanup;
   }
-
-  // ─── Biometric Fast-Lock ───────────────────────────────────────────────────
 
   /// Locks the current session for biometric re-authentication.
   ///
@@ -170,10 +230,8 @@ class ZenithIdentityCoordinator {
     if (scope == null) return;
 
     final current = _state;
-    Object? session;
-    if (current is AuthAuthenticated) {
-      session = current.session;
-    }
+    if (current is! AuthAuthenticated) return;
+    final session = current.session;
 
     scope.markDormant();
     _state = AuthLocked(session);
@@ -185,9 +243,9 @@ class ZenithIdentityCoordinator {
     final scope = _currentScope;
     if (scope == null) return;
 
-    scope.markActive();
     final locked = _state;
     if (locked is AuthLocked) {
+      scope.markActive();
       _state = AuthAuthenticated(locked.session);
       _notifyListeners();
     }
@@ -206,12 +264,11 @@ class ZenithIdentityCoordinator {
     required String tenantId,
     required RevocationReason reason,
   }) async {
-    if (_manager.hasScope(tenantId)) {
-      _manager.endScope(tenantId);
+    if (_currentScope?.id == tenantId || _migrationScope?.id == tenantId) {
+      await signOut();
+    } else {
+      await _manager.endScopeAsync(tenantId);
     }
-    _currentScope = null;
-    _state = AuthUnauthenticated();
-    _notifyListeners();
 
     for (final listener in List.of(_revocationListeners)) {
       try {

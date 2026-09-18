@@ -1,5 +1,9 @@
-import '../scope/zenith_drainable.dart';
+import 'dart:async';
 import '../scope/zenith_scope_manager.dart';
+
+class _CancelledAcquisition extends StateError {
+  _CancelledAcquisition() : super('Database acquisition was cancelled');
+}
 
 /// Abstract handle to a single database connection for one tenant.
 ///
@@ -20,96 +24,181 @@ abstract class ZenithDatabaseHandle {
   Future<void> close();
 }
 
-/// Provisions and tracks per-tenant [ZenithDatabaseHandle]s, isolating each
-/// tenant's data to a separate physical file.
-///
-/// File path convention: `{baseDir}/tenants/{tenantId}/data.db`
-///
-/// ```dart
-/// final pool = ZenithDatabasePool(baseDir: '/app/db');
-/// final handle = await pool.acquireConnection('user_a', scope: userAScope);
-/// // handle.filePath == '/app/db/tenants/user_a/data.db'
-/// ```
+/// Owns one connection per tenant. Supply a real driver factory explicitly.
+/// Use [InMemoryDatabasePool] for simulated connections in tests.
 class ZenithDatabasePool {
-  /// The base directory under which tenant sub-directories are created.
+  /// Root directory for tenant databases.
   final String baseDir;
 
+  /// Application driver factory for physical database handles.
+  final Future<ZenithDatabaseHandle> Function(String path) openHandle;
   final Map<String, ZenithDatabaseHandle> _handles = {};
+  final Map<String, Future<ZenithDatabaseHandle>> _pending = {};
+  final Map<String, int> _generation = {};
+  final Map<ZenithDatabaseHandle, ZenithTenantScope> _owners = {};
+  final Map<String, Future<void>> _releasing = {};
+  bool _isDisposed = false;
+  Future<void>? _disposeFuture;
 
-  /// Creates a [ZenithDatabasePool] rooted at [baseDir].
-  ZenithDatabasePool({required this.baseDir});
+  /// [openHandle] opens the supplied physical path using the application's driver.
+  ZenithDatabasePool({required this.baseDir, required this.openHandle});
 
-  /// Opens (or returns the cached open) handle for [tenantId].
-  ///
-  /// If [scope] is provided, this database pool automatically attaches a
-  /// [ZenithDrainable] to [scope] so that [releaseConnection] is called
-  /// automatically when the scope drains or disposes.
+  /// Shares in-flight opens and rejects acquisitions for closing scopes.
   Future<ZenithDatabaseHandle> acquireConnection(
     String tenantId, {
     ZenithTenantScope? scope,
   }) async {
-    final existing = _handles[tenantId];
-    if (existing != null && existing.isOpen) {
-      if (scope != null) {
-        bindScope(scope);
-      }
-      return existing;
-    }
-    final path = '$baseDir/tenants/$tenantId/data.db';
-    final handle = await _openHandle(path);
-    _handles[tenantId] = handle;
-
+    if (_isDisposed) throw StateError('Database pool is disposed');
+    if (tenantId.isEmpty) throw ArgumentError.value(tenantId, 'tenantId');
     if (scope != null) {
+      if (scope.id != tenantId) {
+        throw ArgumentError('Scope and tenant IDs differ');
+      }
+      if (scope.isDisposed || scope.isClosing) {
+        throw StateError('Scope is closing');
+      }
+    }
+    final releasing = _releasing[tenantId];
+    if (releasing != null) await releasing;
+    if (_isDisposed) throw StateError('Database pool is disposed');
+    if (scope != null && (scope.isDisposed || scope.isClosing)) {
+      throw StateError('Scope is closing');
+    }
+    final cached = _handles[tenantId];
+    final handle = cached != null && cached.isOpen
+        ? cached
+        : await (_pending[tenantId] ?? _startOpen(tenantId));
+    if (_isDisposed ||
+        !handle.isOpen ||
+        !identical(_handles[tenantId], handle)) {
+      throw StateError('Connection ended before acquisition completed');
+    }
+    if (scope != null) {
+      if (scope.isDisposed || scope.isClosing) {
+        if (_owners[handle] == null || identical(_owners[handle], scope)) {
+          await _releaseOwned(tenantId, handle);
+        }
+        throw StateError('Scope ended while opening database');
+      }
       bindScope(scope);
     }
     return handle;
   }
 
-  /// Automatically binds this pool's connection release to [scope]'s
-  /// drainable lifecycle, ensuring physical file locks are released on logout.
+  Future<ZenithDatabaseHandle> _startOpen(String tenantId) {
+    final generation = _generation[tenantId] ?? 0;
+    final completion = Completer<ZenithDatabaseHandle>();
+    _pending[tenantId] = completion.future;
+    final segment = Uri.encodeComponent(tenantId).replaceAll('.', '%2E');
+    Future<ZenithDatabaseHandle>.sync(
+          () => openHandle('$baseDir/tenants/$segment/data.db'),
+        )
+        .then((handle) async {
+          if (_isDisposed || generation != (_generation[tenantId] ?? 0)) {
+            await handle.close();
+            throw _CancelledAcquisition();
+          }
+          if (!handle.isOpen) {
+            throw StateError('Factory returned a closed handle');
+          }
+          _handles[tenantId] = handle;
+          return handle;
+        })
+        .then(
+          (handle) {
+            if (identical(_pending[tenantId], completion.future)) {
+              _pending.remove(tenantId);
+            }
+            completion.complete(handle);
+          },
+          onError: (Object error, StackTrace stack) {
+            if (identical(_pending[tenantId], completion.future)) {
+              _pending.remove(tenantId);
+            }
+            completion.completeError(error, stack);
+          },
+        );
+    return completion.future;
+  }
+
+  /// Binds the currently open handle, once, to this scope's async cleanup.
   void bindScope(ZenithTenantScope scope) {
-    scope.registerDrainable(
-      ZenithDrainableCallback(() => releaseConnection(scope.id)),
-    );
+    if (scope.isClosing || scope.isDisposed) {
+      throw StateError('Scope is closing');
+    }
+    final handle = _handles[scope.id];
+    if (handle == null) throw StateError('Acquire a connection before binding');
+    final owner = _owners[handle];
+    if (owner != null && !identical(owner, scope)) {
+      throw StateError('Connection is still owned by another scope');
+    }
+    if (owner == null) {
+      _owners[handle] = scope;
+      scope.onDisposeAsync(() => _releaseOwned(scope.id, handle));
+    }
   }
 
-  /// Closes the connection for [tenantId] if it is open.
-  Future<void> releaseConnection(String tenantId) async {
+  Future<void> _releaseOwned(
+    String tenantId,
+    ZenithDatabaseHandle handle,
+  ) async {
+    if (identical(_handles[tenantId], handle)) {
+      await releaseConnection(tenantId);
+    }
+  }
+
+  /// Closes the cached handle and cancels any in-flight acquisition for this ID.
+  Future<void> releaseConnection(String tenantId) {
+    final existing = _releasing[tenantId];
+    if (existing != null) return existing;
+    final completion = Completer<void>();
+    _releasing[tenantId] = completion.future;
+    _generation[tenantId] = (_generation[tenantId] ?? 0) + 1;
+    final pending = _pending.remove(tenantId);
     final handle = _handles.remove(tenantId);
-    if (handle != null && handle.isOpen) {
-      await handle.close();
+    if (handle != null) _owners.remove(handle);
+    Future.wait<void>([
+      if (handle != null && handle.isOpen) Future<void>.sync(handle.close),
+      if (pending != null) _waitForCancelledOpen(pending),
+    ]).then(
+      (_) {
+        _releasing.remove(tenantId);
+        completion.complete();
+      },
+      onError: (Object error, StackTrace stack) {
+        _releasing.remove(tenantId);
+        completion.completeError(error, stack);
+      },
+    );
+    return completion.future;
+  }
+
+  Future<void> _waitForCancelledOpen(
+    Future<ZenithDatabaseHandle> pending,
+  ) async {
+    try {
+      await pending;
+    } on _CancelledAcquisition {
+      // Cancellation is expected. Driver/open/close failures still propagate.
     }
   }
 
-  /// Closes all open connections.
-  Future<void> disposeAll() async {
-    for (final handle in List.of(_handles.values)) {
-      if (handle.isOpen) {
-        await handle.close();
-      }
-    }
-    _handles.clear();
-  }
-
-  /// Factory method — override in subclasses or provide [InMemoryDatabasePool]
-  /// for tests. Default implementation returns an [_InMemoryHandle].
-  Future<ZenithDatabaseHandle> _openHandle(String path) async {
-    return _InMemoryHandle(path);
+  /// Permanently closes the pool, including acquisitions already in flight.
+  Future<void> disposeAll() {
+    if (_disposeFuture != null) return _disposeFuture!;
+    _isDisposed = true;
+    final ids = {..._handles.keys, ..._pending.keys, ..._releasing.keys};
+    return _disposeFuture = Future.wait(
+      ids.map(releaseConnection),
+    ).then((_) {});
   }
 }
 
-/// An in-memory [ZenithDatabasePool] for unit tests.
-///
-/// Returns [InMemoryDatabaseHandle]s that simulate file-path isolation without
-/// touching disk. No SQLite or platform dependencies required.
+/// Simulated connections for tests; never touches physical storage.
 class InMemoryDatabasePool extends ZenithDatabasePool {
-  /// Creates an [InMemoryDatabasePool] with [baseDir].
-  InMemoryDatabasePool({required super.baseDir});
-
-  @override
-  Future<ZenithDatabaseHandle> _openHandle(String path) async {
-    return _InMemoryHandle(path);
-  }
+  /// Creates an in-memory pool rooted at [baseDir].
+  InMemoryDatabasePool({required super.baseDir})
+    : super(openHandle: (path) async => _InMemoryHandle(path));
 }
 
 /// Internal in-memory implementation of [ZenithDatabaseHandle].
