@@ -36,7 +36,10 @@ void main() {
         environment: ZenithEnvironment.development,
         environmentOverrides: {
           ZenithEnvironment.development: [
-            ZenithOverride<ApiService>(apiServiceKey, (_) => DevMockApiService()),
+            ZenithOverride<ApiService>(
+              apiServiceKey,
+              (_) => DevMockApiService(),
+            ),
           ],
         },
       );
@@ -57,7 +60,10 @@ void main() {
         environment: ZenithEnvironment.production,
         environmentOverrides: {
           ZenithEnvironment.development: [
-            ZenithOverride<ApiService>(apiServiceKey, (_) => DevMockApiService()),
+            ZenithOverride<ApiService>(
+              apiServiceKey,
+              (_) => DevMockApiService(),
+            ),
           ],
         },
       );

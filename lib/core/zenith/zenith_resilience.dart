@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:collection';
 import 'dart:math';
 
 import 'async_value.dart';
@@ -42,14 +43,16 @@ class ZenithResiliencePipeline {
 
   int? _rateLimitMaxRequests;
   Duration _rateLimitWindow = const Duration(seconds: 1);
-  final List<DateTime> _requestTimestamps = <DateTime>[];
+  final Stopwatch _rateClock = Stopwatch()..start();
+  final Queue<Duration> _requestTimestamps = Queue<Duration>();
 
   final Random _random = Random();
 
   /// Gets the current circuit breaker state.
   CircuitState get circuitState {
     if (_circuitState == CircuitState.open && _circuitOpenedAt != null) {
-      if (DateTime.now().difference(_circuitOpenedAt!) >= _circuitResetTimeout) {
+      if (DateTime.now().difference(_circuitOpenedAt!) >=
+          _circuitResetTimeout) {
         _circuitState = CircuitState.halfOpen;
       }
     }
@@ -104,10 +107,11 @@ class ZenithResiliencePipeline {
 
     // 2. Check Rate Limiter
     if (_rateLimitMaxRequests != null) {
-      final now = DateTime.now();
-      _requestTimestamps.removeWhere(
-        (t) => now.difference(t) > _rateLimitWindow,
-      );
+      final now = _rateClock.elapsed;
+      while (_requestTimestamps.isNotEmpty &&
+          (now - _requestTimestamps.first) > _rateLimitWindow) {
+        _requestTimestamps.removeFirst();
+      }
 
       if (_requestTimestamps.length >= _rateLimitMaxRequests!) {
         throw StateError(
@@ -158,7 +162,8 @@ class ZenithResiliencePipeline {
 
         await Future<void>.delayed(Duration(milliseconds: delayMs.toInt()));
         currentDelay = Duration(
-          milliseconds: (currentDelay.inMilliseconds * _retryBackoffFactor).toInt(),
+          milliseconds: (currentDelay.inMilliseconds * _retryBackoffFactor)
+              .toInt(),
         );
       }
     }

@@ -34,15 +34,17 @@ class ZenithConcurrencyRunner {
     final token = ZenithCancellationToken();
     _currentToken = token;
 
-    task(token).then((_) {
-      if (identical(_currentToken, token)) {
-        _currentToken = null;
-      }
-    }).catchError((_) {
-      if (identical(_currentToken, token)) {
-        _currentToken = null;
-      }
-    });
+    task(token)
+        .then((_) {
+          if (identical(_currentToken, token)) {
+            _currentToken = null;
+          }
+        })
+        .catchError((_) {
+          if (identical(_currentToken, token)) {
+            _currentToken = null;
+          }
+        });
   }
 
   /// Cancels the currently active task, if any.

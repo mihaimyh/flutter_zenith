@@ -78,53 +78,52 @@ void main() {
       },
     );
 
-    test('ref.set() mutates while mounted and silently no-ops once disposed', () {
-      final container = ZenithContainer();
-      late ZenithRef ref;
-      final node = container.getOrCreateNode<int>('count', (capturedRef) {
-        ref = capturedRef;
-        return 0;
-      });
-
-      ref.set(node, 5);
-      expect(node.value, 5);
-
-      container.dispose();
-
-      expect(() => ref.set(node, 10), returnsNormally);
-      expect(node.isDisposed, isTrue);
-    });
-
     test(
-      'ref.runAsync() resolves to AsyncData while mounted and no-ops after '
-      'disposal',
-      () async {
+      'ref.set() mutates while mounted and silently no-ops once disposed',
+      () {
         final container = ZenithContainer();
         late ZenithRef ref;
-        final node = container.getOrCreateNode<AsyncValue<int>>(
-          'asyncCount',
-          (capturedRef) {
-            ref = capturedRef;
-            return const AsyncData<int>(0);
-          },
-        );
-
-        await ref.runAsync(node, () async => 42);
-
-        expect(node.value, isA<AsyncData<int>>());
-        expect((node.value as AsyncData<int>).value, 42);
-
-        final pendingRunAsync = ref.runAsync(node, () async {
-          await Future<void>.delayed(const Duration(milliseconds: 10));
-          return 99;
+        final node = container.getOrCreateNode<int>('count', (capturedRef) {
+          ref = capturedRef;
+          return 0;
         });
+
+        ref.set(node, 5);
+        expect(node.value, 5);
 
         container.dispose();
 
-        await expectLater(pendingRunAsync, completes);
+        expect(() => ref.set(node, 10), returnsNormally);
         expect(node.isDisposed, isTrue);
       },
     );
+
+    test('ref.runAsync() resolves to AsyncData while mounted and no-ops after '
+        'disposal', () async {
+      final container = ZenithContainer();
+      late ZenithRef ref;
+      final node = container.getOrCreateNode<AsyncValue<int>>('asyncCount', (
+        capturedRef,
+      ) {
+        ref = capturedRef;
+        return const AsyncData<int>(0);
+      });
+
+      await ref.runAsync(node, () async => 42);
+
+      expect(node.value, isA<AsyncData<int>>());
+      expect((node.value as AsyncData<int>).value, 42);
+
+      final pendingRunAsync = ref.runAsync(node, () async {
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+        return 99;
+      });
+
+      container.dispose();
+
+      await expectLater(pendingRunAsync, completes);
+      expect(node.isDisposed, isTrue);
+    });
 
     test(
       'ZenithNode.guard() extension delegates to ref.runAsync() safely',

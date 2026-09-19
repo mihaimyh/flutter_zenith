@@ -4,8 +4,7 @@ import '../core/zenith/zenith_key.dart';
 
 /// Builds a [ZenithContainer] with typed dependency overrides for tests.
 class ZenithTestContainerBuilder {
-  final List<ZenithOverride<dynamic>> _overrides =
-      <ZenithOverride<dynamic>>[];
+  final List<ZenithOverride<dynamic>> _overrides = <ZenithOverride<dynamic>>[];
 
   /// Overrides [key] with [factory] in the built test container.
   ZenithTestContainerBuilder override<T>(

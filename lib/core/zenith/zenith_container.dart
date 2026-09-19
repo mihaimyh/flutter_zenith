@@ -270,15 +270,16 @@ class ZenithContainer {
     final ref = ZenithRef(this);
     _refs[key] = ref;
 
-    final initialValue;
+    final T initialValue;
     try {
       initialValue = factory(ref);
     } catch (_) {
+      ref._dispose();
       _activeRefs.remove(ref);
       _refs.remove(key);
       rethrow;
     }
-    
+
     final node = ZenithNode<T>(initialValue);
     _nodes[key] = node;
     return node;
@@ -313,15 +314,16 @@ class ZenithContainer {
     final ref = ZenithRef(this);
     _refs[key] = ref;
 
-    final initialValue;
+    final T initialValue;
     try {
       initialValue = effectiveFactory(ref);
     } catch (_) {
+      ref._dispose();
       _activeRefs.remove(ref);
       _refs.remove(key);
       rethrow;
     }
-    
+
     final node = ZenithNode<T>(initialValue);
     _nodes[key] = node;
     return node;
@@ -405,7 +407,7 @@ class ZenithContainer {
     _activeRefs.clear();
     _refs.clear();
     _nodes.clear();
-    
+
     await _cleanupFuture;
   }
 

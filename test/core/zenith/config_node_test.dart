@@ -84,22 +84,25 @@ void main() {
       expect(notifications, 0);
     });
 
-    test('updateRaw gracefully catches decoder exceptions and returns false', () {
-      final configNode = ZenithConfigNode<AppConfig>(
-        key: 'app_options',
-        initialConfig: defaultConfig,
-        decoder: AppConfig.fromJson,
-      );
+    test(
+      'updateRaw gracefully catches decoder exceptions and returns false',
+      () {
+        final configNode = ZenithConfigNode<AppConfig>(
+          key: 'app_options',
+          initialConfig: defaultConfig,
+          decoder: AppConfig.fromJson,
+        );
 
-      // Malformed map causing type error
-      final success = configNode.updateRaw({
-        'max_retries': 'invalid_string_not_int',
-      });
+        // Malformed map causing type error
+        final success = configNode.updateRaw({
+          'max_retries': 'invalid_string_not_int',
+        });
 
-      expect(success, isFalse);
-      // Value remains untouched
-      expect(configNode.value.maxRetries, 3);
-    });
+        expect(success, isFalse);
+        // Value remains untouched
+        expect(configNode.value.maxRetries, 3);
+      },
+    );
   });
 }
 

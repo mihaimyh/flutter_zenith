@@ -5,7 +5,10 @@ void main() {
   group('AsyncValue equality', () {
     test('AsyncData with same value are equal', () {
       expect(const AsyncData<int>(42), equals(const AsyncData<int>(42)));
-      expect(const AsyncData<int>(42).hashCode, const AsyncData<int>(42).hashCode);
+      expect(
+        const AsyncData<int>(42).hashCode,
+        const AsyncData<int>(42).hashCode,
+      );
     });
 
     test('AsyncData with different values are not equal', () {
@@ -13,14 +16,14 @@ void main() {
     });
 
     test('AsyncData and AsyncLoading are not equal', () {
-      expect(const AsyncData<int>(42), isNot(equals(const AsyncLoading<int>(42))));
+      expect(
+        const AsyncData<int>(42),
+        isNot(equals(const AsyncLoading<int>(42))),
+      );
     });
 
     test('AsyncLoading with same previousData are equal', () {
-      expect(
-        const AsyncLoading<int>(42),
-        equals(const AsyncLoading<int>(42)),
-      );
+      expect(const AsyncLoading<int>(42), equals(const AsyncLoading<int>(42)));
       expect(
         const AsyncLoading<int>(42).hashCode,
         const AsyncLoading<int>(42).hashCode,
@@ -28,10 +31,7 @@ void main() {
     });
 
     test('AsyncLoading with null previousData are equal', () {
-      expect(
-        const AsyncLoading<int>(),
-        equals(const AsyncLoading<int>()),
-      );
+      expect(const AsyncLoading<int>(), equals(const AsyncLoading<int>()));
     });
 
     test('AsyncError with same error are equal', () {
@@ -105,15 +105,11 @@ void main() {
     test('whenOrNull returns null for unhandled states', () {
       const AsyncValue<int> loading = AsyncLoading<int>();
 
-      final result = loading.whenOrNull<String>(
-        data: (v) => 'data:$v',
-      );
+      final result = loading.whenOrNull<String>(data: (v) => 'data:$v');
       expect(result, isNull);
 
       const AsyncValue<int> data = AsyncData<int>(42);
-      final dataResult = data.whenOrNull<String>(
-        data: (v) => 'data:$v',
-      );
+      final dataResult = data.whenOrNull<String>(data: (v) => 'data:$v');
       expect(dataResult, 'data:42');
     });
 

@@ -138,7 +138,7 @@ class ZenithLogger {
 
   /// Creates a [ZenithLogger] with the given [sinks].
   ZenithLogger({List<ZenithLogSink>? sinks})
-      : sinks = sinks ?? <ZenithLogSink>[ConsoleSink()];
+    : sinks = sinks ?? <ZenithLogSink>[ConsoleSink()];
 
   /// Logs an informational message.
   void info(
@@ -147,13 +147,7 @@ class ZenithLogger {
     Object? error,
     StackTrace? stackTrace,
   ]) {
-    log(
-      ZenithLogLevel.info,
-      template,
-      properties,
-      error,
-      stackTrace,
-    );
+    log(ZenithLogLevel.info, template, properties, error, stackTrace);
   }
 
   /// Logs a warning message.
@@ -163,13 +157,7 @@ class ZenithLogger {
     Object? error,
     StackTrace? stackTrace,
   ]) {
-    log(
-      ZenithLogLevel.warning,
-      template,
-      properties,
-      error,
-      stackTrace,
-    );
+    log(ZenithLogLevel.warning, template, properties, error, stackTrace);
   }
 
   /// Logs an error message.
@@ -179,13 +167,7 @@ class ZenithLogger {
     Object? error,
     StackTrace? stackTrace,
   ]) {
-    log(
-      ZenithLogLevel.error,
-      template,
-      properties,
-      error,
-      stackTrace,
-    );
+    log(ZenithLogLevel.error, template, properties, error, stackTrace);
   }
 
   /// Core log emission method. Applies PII redaction to properties and broadcasts to sinks.
@@ -217,7 +199,7 @@ class ZenithLogger {
     final sanitized = Map<String, dynamic>.from(input);
     for (final entry in input.entries) {
       final lowerKey = entry.key.toLowerCase().replaceAll('_', '');
-      if (_piiKeys.any((k) => lowerKey.contains(k))) {
+      if (_piiKeys.any((k) => lowerKey.contains(k.replaceAll('_', '')))) {
         sanitized[entry.key] = '[REDACTED]';
       }
     }

@@ -27,7 +27,10 @@ class ExpenseDraftController {
 
     titleNode = container.getOrCreateNode<String>(_titleKey, (_) => '');
     amountNode = container.getOrCreateNode<String>(_amountKey, (_) => '');
-    categoryNode = container.getOrCreateNode<String>(_categoryKey, (_) => 'Food');
+    categoryNode = container.getOrCreateNode<String>(
+      _categoryKey,
+      (_) => 'Food',
+    );
     isValidNode = container.getOrCreateNode<bool>(_validKey, (_) => false);
     submitResultNode = container.getOrCreateNode<AsyncValue<bool>>(
       _submitKey,
@@ -57,7 +60,10 @@ class ExpenseDraftController {
 
   void _recomputeIsValid() {
     final parsedAmount = double.tryParse(amountNode.value);
-    final next = titleNode.value.trim().isNotEmpty && parsedAmount != null && parsedAmount > 0;
+    final next =
+        titleNode.value.trim().isNotEmpty &&
+        parsedAmount != null &&
+        parsedAmount > 0;
 
     isValidNode.set(next);
   }

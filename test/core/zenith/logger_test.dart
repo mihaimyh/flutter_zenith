@@ -23,22 +23,25 @@ void main() {
       expect(event.properties['creditCard'], '[REDACTED]');
     });
 
-    test('MemoryRingBufferSink maintains maximum capacity and drops oldest logs', () {
-      final memorySink = MemoryRingBufferSink(maxCapacity: 3);
-      final logger = ZenithLogger(sinks: [memorySink]);
+    test(
+      'MemoryRingBufferSink maintains maximum capacity and drops oldest logs',
+      () {
+        final memorySink = MemoryRingBufferSink(maxCapacity: 3);
+        final logger = ZenithLogger(sinks: [memorySink]);
 
-      logger.info('log 1');
-      logger.info('log 2');
-      logger.info('log 3');
-      expect(memorySink.logs.length, 3);
-      expect(memorySink.logs.first.template, 'log 1');
+        logger.info('log 1');
+        logger.info('log 2');
+        logger.info('log 3');
+        expect(memorySink.logs.length, 3);
+        expect(memorySink.logs.first.template, 'log 1');
 
-      // Add 4th log: log 1 is evicted
-      logger.info('log 4');
-      expect(memorySink.logs.length, 3);
-      expect(memorySink.logs.first.template, 'log 2');
-      expect(memorySink.logs.last.template, 'log 4');
-    });
+        // Add 4th log: log 1 is evicted
+        logger.info('log 4');
+        expect(memorySink.logs.length, 3);
+        expect(memorySink.logs.first.template, 'log 2');
+        expect(memorySink.logs.last.template, 'log 4');
+      },
+    );
 
     test('formats template string with properties correctly', () {
       final memorySink = MemoryRingBufferSink(maxCapacity: 5);

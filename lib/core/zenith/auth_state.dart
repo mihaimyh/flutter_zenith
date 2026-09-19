@@ -78,8 +78,10 @@ sealed class AuthState<T> {
       AuthUnauthenticated<T>() => unauthenticated?.call(),
       AuthAuthenticating<T>() => authenticating?.call(),
       AuthAuthenticated<T>(:final user) => authenticated?.call(user),
-      AuthError<T>(error: final err, stackTrace: final st) =>
-        error?.call(err, st),
+      AuthError<T>(error: final err, stackTrace: final st) => error?.call(
+        err,
+        st,
+      ),
     };
   }
 
@@ -167,8 +169,7 @@ class AuthError<T> extends AuthState<T> {
 
   @override
   bool operator ==(Object other) =>
-      identical(this, other) ||
-      (other is AuthError<T> && other.error == error);
+      identical(this, other) || (other is AuthError<T> && other.error == error);
 
   @override
   int get hashCode => Object.hash(runtimeType, error);

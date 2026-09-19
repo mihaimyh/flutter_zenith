@@ -1,3 +1,31 @@
+## 0.13.0
+
+### Migration
+
+* Family keys now use the argument's equality and hash, including its type, instead of `toString()`. Construct keys with `family(argument)`; manually built `ZenithKey('family#argument')` values no longer match. Keep argument equality stable while a key is in use.
+* Key equality now requires the same runtime type, making comparisons between different generic key types symmetric.
+* Authenticated widget state is reset when the account scope changes. Move intentionally shared UI state outside `ZenithAuthScope`.
+
+### Fixes
+
+* Dispose registered resources when typed or untyped dependency factories fail, while preserving the construction error. Asynchronous cleanup remains observable through container disposal.
+* Make subscription cancellation safe after explicit unsubscribe or weak-reference pruning, so stale handles cannot unlink live listeners.
+* Stop computed dependency collection before notifying consumers, preventing false self-dependency cycles.
+* Await stream cancellation during asynchronous container cleanup and propagate cancellation errors.
+* Normalize configured sensitive-property patterns before matching, so `auth_header` values are redacted before reaching log sinks.
+
+### Performance and verification
+
+* Replace repeated rate-limit timestamp scans with a queue and monotonic elapsed time. Expiration work is amortized constant time per request.
+* Add regressions for all fixes, family-key compatibility, stream cancellation errors and rate-limit expiry. Correct the existing failed-factory test to require cleanup exactly once.
+* Resolve analyzer and formatting failures enforced by CI. Keep timing benchmarks outside normal test discovery.
+
+### Documentation
+
+* Rewrite the README with a complete feature catalog, usage examples, lifecycle contracts and integration limits.
+* Correct earlier portability and cleanup claims: the container still depends transitively on Flutter, failed factories must run registered cleanup, and guarded-task token removal uses a list rather than constant-time eviction.
+* Document migration details in [audit fixes and migration notes](doc/audit-fixes.md).
+
 ## 0.12.0
 
 * **Performance / Architecture:** Refactored `ZenithNode` subscriber collections to use an internal $O(1)$ doubly-linked list. `subscribe` now returns an opaque `ZenithSubscription` handle, completely eliminating linear scans for both addition and unsubscription.
@@ -23,12 +51,12 @@
 * Added observable service startup/shutdown, a separate locked UI builder, stable outbox mutation IDs, and secure-value purging on reset. Fixed parallel mediator calls and selector configuration changes.
 * Replaced repeated outbox list removal with constant-time removal and removed retained historical secure-value references.
 
-* **Docs:** Clarified that `ZenithNode.set` equality short-circuit means re-setting an equal `AsyncValue` (e.g. `AsyncData(sameUser)`) does **not** notify subscribers. Side-effect re-triggers should use `ZenithNode.invalidate()`, a dedicated signal node, or an explicit callback — documented on `ZenithNode.set` / `invalidate`, `AsyncValue`, and the README AI agent rules.
+* **Docs:** Clarified that `ZenithNode.set` equality short-circuit means re-setting an equal `AsyncValue` (e.g. `AsyncData(sameUser)`) does **not** notify subscribers. Side-effect re-triggers should use `ZenithNode.invalidate()`, a dedicated signal node, or an explicit callback â€” documented on `ZenithNode.set` / `invalidate`, `AsyncValue`, and the README AI agent rules.
 
 ## 0.11.4 - Deferred rebuilds during Flutter build/layout
 
 * **`ZenithSafeRebuild`:** `ZenithBuilder`, `ZenithSelector`, `ZenithListener`, and `ZenithAuthorizeView` no longer call `setState` synchronously when a node is written during another widget's `build` (or during layout/paint). Rebuilds and listener callbacks are coalesced onto a post-frame callback, preventing `setState() or markNeedsBuild() called during build`.
-* If the notifying `ZenithBuilder` is itself currently building, the extra rebuild is skipped — that frame already reads the new value.
+* If the notifying `ZenithBuilder` is itself currently building, the extra rebuild is skipped â€” that frame already reads the new value.
 
 ## 0.11.3 - Safe InheritedWidget Scope Resolution
 
@@ -49,7 +77,7 @@
 
 * **Standalone Enterprise Barrel (`zenith_identity.dart`):** Added a dedicated entry point for multi-tenant scoping, identity management, policy-based authorization, and compliance isolation.
 * **Scope Hierarchy & Lifetime Management (`ZenithScopeManager`):**
-  - Added `ZenithScopeManager` supporting 3-tier hierarchy (`AppScope` → `UserScope` → `WorkspaceScope`).
+  - Added `ZenithScopeManager` supporting 3-tier hierarchy (`AppScope` â†’ `UserScope` â†’ `WorkspaceScope`).
   - **Zone-Based Captive Dependency Guard:** Traps singleton factories resolving scoped dependencies from child containers via Dart Zones (`#zenith_is_singleton_construction`), throwing `ZenithCaptiveDependencyException`.
   - Added `ZenithDrainable` and two-phase asynchronous scope teardown (`drainAndDispose`).
 * **Identity Lifecycle & Migration Engine (`ZenithIdentityCoordinator`):**

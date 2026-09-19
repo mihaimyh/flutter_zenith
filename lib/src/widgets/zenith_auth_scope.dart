@@ -125,6 +125,7 @@ class _ZenithAuthScopeState extends State<ZenithAuthScope> {
 
     if (scope != null && !scope.isDisposed) {
       return ZenithScopeProvider(
+        key: ObjectKey(scope),
         scope: scope,
         child: Builder(
           builder: (ctx) => widget.authenticatedBuilder(ctx, scope),

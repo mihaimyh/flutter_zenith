@@ -55,7 +55,7 @@ extension ZenithStreamX on ZenithRef {
       },
     );
 
-    onDispose(subscription.cancel);
+    onDisposeAsync(subscription.cancel);
 
     return subscription;
   }

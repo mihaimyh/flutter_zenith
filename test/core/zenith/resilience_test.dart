@@ -45,49 +45,52 @@ void main() {
   });
 
   group('ZenithResiliencePipeline CircuitBreaker Strategy', () {
-    test('opens circuit when failureThreshold is reached and rejects requests', () async {
-      final pipeline = ZenithResiliencePipeline().withCircuitBreaker(
-        failureThreshold: 2,
-        resetTimeout: const Duration(milliseconds: 50),
-      );
+    test(
+      'opens circuit when failureThreshold is reached and rejects requests',
+      () async {
+        final pipeline = ZenithResiliencePipeline().withCircuitBreaker(
+          failureThreshold: 2,
+          resetTimeout: const Duration(milliseconds: 50),
+        );
 
-      expect(pipeline.circuitState, CircuitState.closed);
+        expect(pipeline.circuitState, CircuitState.closed);
 
-      // Failure 1
-      try {
-        await pipeline.execute(() async => throw Exception('err1'));
-      } catch (_) {}
+        // Failure 1
+        try {
+          await pipeline.execute(() async => throw Exception('err1'));
+        } catch (_) {}
 
-      expect(pipeline.circuitState, CircuitState.closed);
+        expect(pipeline.circuitState, CircuitState.closed);
 
-      // Failure 2 (reaches threshold of 2)
-      try {
-        await pipeline.execute(() async => throw Exception('err2'));
-      } catch (_) {}
+        // Failure 2 (reaches threshold of 2)
+        try {
+          await pipeline.execute(() async => throw Exception('err2'));
+        } catch (_) {}
 
-      // Circuit is now OPEN
-      expect(pipeline.circuitState, CircuitState.open);
+        // Circuit is now OPEN
+        expect(pipeline.circuitState, CircuitState.open);
 
-      // Next call is immediately rejected without running task
-      var taskRan = false;
-      expect(
-        () => pipeline.execute(() async {
-          taskRan = true;
-          return 'ok';
-        }),
-        throwsStateError,
-      );
-      expect(taskRan, isFalse);
+        // Next call is immediately rejected without running task
+        var taskRan = false;
+        expect(
+          () => pipeline.execute(() async {
+            taskRan = true;
+            return 'ok';
+          }),
+          throwsStateError,
+        );
+        expect(taskRan, isFalse);
 
-      // Wait for resetTimeout to pass -> halfOpen
-      await Future<void>.delayed(const Duration(milliseconds: 60));
-      expect(pipeline.circuitState, CircuitState.halfOpen);
+        // Wait for resetTimeout to pass -> halfOpen
+        await Future<void>.delayed(const Duration(milliseconds: 60));
+        expect(pipeline.circuitState, CircuitState.halfOpen);
 
-      // Successful call resets circuit back to closed
-      final res = await pipeline.execute(() async => 'recovered');
-      expect(res, 'recovered');
-      expect(pipeline.circuitState, CircuitState.closed);
-    });
+        // Successful call resets circuit back to closed
+        final res = await pipeline.execute(() async => 'recovered');
+        expect(res, 'recovered');
+        expect(pipeline.circuitState, CircuitState.closed);
+      },
+    );
   });
 
   group('ZenithResiliencePipeline RateLimiter Strategy', () {
@@ -104,10 +107,7 @@ void main() {
       expect(r2, 'req2');
 
       // 3rd request exceeds limit of 2 in 100ms window
-      expect(
-        () => pipeline.execute(() async => 'req3'),
-        throwsStateError,
-      );
+      expect(() => pipeline.execute(() async => 'req3'), throwsStateError);
     });
   });
 }

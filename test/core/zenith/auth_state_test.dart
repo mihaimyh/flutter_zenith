@@ -110,9 +110,7 @@ void main() {
     test('whenOrNull returns null for unhandled states', () {
       const AuthState<TestUser> state = AuthAuthenticating<TestUser>();
 
-      final userResult = state.whenOrNull(
-        authenticated: (u) => u,
-      );
+      final userResult = state.whenOrNull(authenticated: (u) => u);
 
       expect(userResult, isNull);
     });

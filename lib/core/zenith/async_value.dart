@@ -78,8 +78,10 @@ sealed class AsyncValue<T> {
     return switch (this) {
       AsyncData<T>(:final value) => data?.call(value),
       AsyncLoading<T>(:final previousData) => loading?.call(previousData),
-      AsyncError<T>(error: final err, stackTrace: final st) =>
-        error?.call(err, st),
+      AsyncError<T>(error: final err, stackTrace: final st) => error?.call(
+        err,
+        st,
+      ),
     };
   }
 
@@ -131,8 +133,7 @@ class AsyncData<T> extends AsyncValue<T> {
 
   @override
   bool operator ==(Object other) =>
-      identical(this, other) ||
-      (other is AsyncData<T> && other.value == value);
+      identical(this, other) || (other is AsyncData<T> && other.value == value);
 
   @override
   int get hashCode => Object.hash(runtimeType, value);

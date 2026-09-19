@@ -9,10 +9,7 @@ import 'zenith_node.dart';
 /// subsequent operation is pending and ignore stale results by default.
 class ZenithMutation<T> {
   /// Creates a mutation that writes operation state to [state].
-  ZenithMutation({
-    required this._ref,
-    required this.state,
-  });
+  ZenithMutation({required this._ref, required this.state});
 
   final ZenithRef _ref;
 

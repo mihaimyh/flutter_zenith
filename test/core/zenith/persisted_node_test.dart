@@ -61,37 +61,43 @@ void main() {
       expect(storage.read('jwt_token'), 'header_token_123');
     });
 
-    test('PersistedNode.integer helper serializes and restores integers', () async {
-      final storage = InMemoryStorage();
-      await storage.write('counter', '42');
+    test(
+      'PersistedNode.integer helper serializes and restores integers',
+      () async {
+        final storage = InMemoryStorage();
+        await storage.write('counter', '42');
 
-      final node = PersistedNode.integer(
-        key: 'counter',
-        defaultValue: 0,
-        storage: storage,
-      );
+        final node = PersistedNode.integer(
+          key: 'counter',
+          defaultValue: 0,
+          storage: storage,
+        );
 
-      expect(node.value, 42);
+        expect(node.value, 42);
 
-      node.set(100);
-      await Future<void>.delayed(Duration.zero);
-      expect(storage.read('counter'), '100');
-    });
+        node.set(100);
+        await Future<void>.delayed(Duration.zero);
+        expect(storage.read('counter'), '100');
+      },
+    );
 
-    test('PersistedNode.boolean helper serializes and restores booleans', () async {
-      final storage = InMemoryStorage();
-      final node = PersistedNode.boolean(
-        key: 'dark_mode',
-        defaultValue: false,
-        storage: storage,
-      );
+    test(
+      'PersistedNode.boolean helper serializes and restores booleans',
+      () async {
+        final storage = InMemoryStorage();
+        final node = PersistedNode.boolean(
+          key: 'dark_mode',
+          defaultValue: false,
+          storage: storage,
+        );
 
-      expect(node.value, isFalse);
+        expect(node.value, isFalse);
 
-      node.set(true);
-      await Future<void>.delayed(Duration.zero);
-      expect(storage.read('dark_mode'), 'true');
-    });
+        node.set(true);
+        await Future<void>.delayed(Duration.zero);
+        expect(storage.read('dark_mode'), 'true');
+      },
+    );
 
     test('custom complex object serialization', () async {
       final storage = InMemoryStorage();

@@ -3,7 +3,11 @@ import 'package:flutter_zenith/flutter_zenith.dart';
 
 class SanitizeWhitespaceMiddleware extends ZenithMiddleware<String> {
   @override
-  String? onWillSet(ZenithNode<String> node, String currentValue, String newValue) {
+  String? onWillSet(
+    ZenithNode<String> node,
+    String currentValue,
+    String newValue,
+  ) {
     return newValue.trim();
   }
 }
@@ -37,27 +41,30 @@ void main() {
       expect(node.value, 'hello zenith');
     });
 
-    test('onWillSet returning null blocks the write and suppresses notifications', () {
-      final node = ZenithNode<int>(
-        10,
-        middleware: [BlockNegativeMiddleware()],
-      );
+    test(
+      'onWillSet returning null blocks the write and suppresses notifications',
+      () {
+        final node = ZenithNode<int>(
+          10,
+          middleware: [BlockNegativeMiddleware()],
+        );
 
-      var notifications = 0;
-      final sub = _CountingSubscriber(() => notifications++);
-      node.subscribe(sub);
+        var notifications = 0;
+        final sub = _CountingSubscriber(() => notifications++);
+        node.subscribe(sub);
 
-      node.set(-5);
+        node.set(-5);
 
-      // Node value stays 10
-      expect(node.value, 10);
-      expect(notifications, 0);
+        // Node value stays 10
+        expect(node.value, 10);
+        expect(notifications, 0);
 
-      // Valid set works normally
-      node.set(20);
-      expect(node.value, 20);
-      expect(notifications, 1);
-    });
+        // Valid set works normally
+        node.set(20);
+        expect(node.value, 20);
+        expect(notifications, 1);
+      },
+    );
 
     test('onDidSet fires after successful node mutation', () {
       final audit = AuditLogMiddleware<int>();

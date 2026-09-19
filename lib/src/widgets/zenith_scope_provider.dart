@@ -22,8 +22,8 @@ class ZenithScopeProvider extends InheritedWidget {
   ///
   /// Asserts that a [ZenithScopeProvider] ancestor exists.
   static ZenithTenantScope of(BuildContext context) {
-    final provider =
-        context.getInheritedWidgetOfExactType<ZenithScopeProvider>();
+    final provider = context
+        .getInheritedWidgetOfExactType<ZenithScopeProvider>();
     assert(
       provider != null,
       'No ZenithScopeProvider found in the widget tree.',
@@ -33,9 +33,7 @@ class ZenithScopeProvider extends InheritedWidget {
 
   /// Retrieves the nearest [ZenithTenantScope] from [context], or null if none exists.
   static ZenithTenantScope? maybeOf(BuildContext context) {
-    return context
-        .getInheritedWidgetOfExactType<ZenithScopeProvider>()
-        ?.scope;
+    return context.getInheritedWidgetOfExactType<ZenithScopeProvider>()?.scope;
   }
 
   @override
@@ -54,9 +52,7 @@ extension ZenithScopeContextX on BuildContext {
     final scope = ZenithScopeProvider.of(this);
     final node = scope.container.maybeNode<T>(key);
     if (node == null) {
-      throw StateError(
-        'No node registered for $key in scope "${scope.id}".',
-      );
+      throw StateError('No node registered for $key in scope "${scope.id}".');
     }
     return node.value;
   }

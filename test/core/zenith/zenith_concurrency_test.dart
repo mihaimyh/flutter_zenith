@@ -23,14 +23,10 @@ void main() {
       );
 
       var secondTaskStarted = false;
-      final future2 = ref.runAsyncGuarded<int>(
-        node,
-        () async {
-          secondTaskStarted = true;
-          return 999;
-        },
-        strategy: ConcurrencyStrategy.droppable,
-      );
+      final future2 = ref.runAsyncGuarded<int>(node, () async {
+        secondTaskStarted = true;
+        return 999;
+      }, strategy: ConcurrencyStrategy.droppable);
 
       await future2;
       expect(secondTaskStarted, isFalse);
@@ -245,20 +241,23 @@ void main() {
   });
 
   group('ZenithIsolateX.runInIsolate', () {
-    test('runs computation on a background isolate and writes AsyncData', () async {
-      final container = ZenithContainer();
-      late ZenithRef ref;
-      final node = container.getOrCreateNode<AsyncValue<int>>('n', (r) {
-        ref = r;
-        return const AsyncData(0);
-      });
+    test(
+      'runs computation on a background isolate and writes AsyncData',
+      () async {
+        final container = ZenithContainer();
+        late ZenithRef ref;
+        final node = container.getOrCreateNode<AsyncValue<int>>('n', (r) {
+          ref = r;
+          return const AsyncData(0);
+        });
 
-      await ref.runInIsolate<int, int>(node, 21, _double);
+        await ref.runInIsolate<int, int>(node, 21, _double);
 
-      expect(node.value, isA<AsyncData<int>>());
-      expect((node.value as AsyncData<int>).value, 42);
+        expect(node.value, isA<AsyncData<int>>());
+        expect((node.value as AsyncData<int>).value, 42);
 
-      container.dispose();
-    });
+        container.dispose();
+      },
+    );
   });
 }

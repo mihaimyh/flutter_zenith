@@ -73,7 +73,7 @@ class _ZenithScopeInherited extends InheritedWidget {
 class ZenithBuilder extends StatefulWidget {
   final Widget Function(BuildContext context) builder;
   final Widget Function(BuildContext context, Object error, StackTrace stack)?
-      errorBuilder;
+  errorBuilder;
 
   const ZenithBuilder({super.key, required this.builder, this.errorBuilder});
 
@@ -123,7 +123,7 @@ class _ZenithBuilderState extends State<ZenithBuilder>
       _subscriptions.remove(node)?.call();
     }
 
-    // newNodes were already subscribed during onNodeRead! 
+    // newNodes were already subscribed during onNodeRead!
     // They are tracked in _nodesReadThisBuild.
     // So we don't need to manually subscribe here.
 
@@ -176,9 +176,7 @@ abstract class ZenithConsumerWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ZenithBuilder(
-      builder: (ctx) => buildConsumer(ctx, ctx.container),
-    );
+    return ZenithBuilder(builder: (ctx) => buildConsumer(ctx, ctx.container));
   }
 }
 
@@ -206,9 +204,7 @@ abstract class ZenithState<T extends ZenithStatefulWidget> extends State<T> {
 
   @override
   Widget build(BuildContext context) {
-    return ZenithBuilder(
-      builder: (ctx) => buildZenith(ctx, ctx.container),
-    );
+    return ZenithBuilder(builder: (ctx) => buildZenith(ctx, ctx.container));
   }
 }
 
@@ -258,16 +254,19 @@ class _StateMixinSubscriber implements ZenithSubscriber {
 
 /// An inline builder widget that subscribes to any [ZenithNode] read within [builder].
 class ZenithConsumer extends StatelessWidget {
-  final Widget Function(BuildContext context, ZenithContainer container, Widget? child) builder;
+  final Widget Function(
+    BuildContext context,
+    ZenithContainer container,
+    Widget? child,
+  )
+  builder;
   final Widget? child;
 
   const ZenithConsumer({super.key, required this.builder, this.child});
 
   @override
   Widget build(BuildContext context) {
-    return ZenithBuilder(
-      builder: (ctx) => builder(ctx, ctx.container, child),
-    );
+    return ZenithBuilder(builder: (ctx) => builder(ctx, ctx.container, child));
   }
 }
 
@@ -339,10 +338,7 @@ extension ZenithContextX on BuildContext {
   ZenithContainer get container => ZenithScope.of(this);
 
   /// Type-safe helper to read or create a node using a [ZenithKey].
-  ZenithNode<T> zenith<T>(
-    ZenithKey<T> key,
-    T Function(ZenithRef ref) factory,
-  ) {
+  ZenithNode<T> zenith<T>(ZenithKey<T> key, T Function(ZenithRef ref) factory) {
     return ZenithScope.of(this).getOrCreate<T>(key, factory);
   }
 

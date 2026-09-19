@@ -29,7 +29,8 @@ class ComputedNode<T> extends ZenithNode<T>
   final T Function() _compute;
 
   final Set<ZenithNode<dynamic>> _trackedSources = <ZenithNode<dynamic>>{};
-  final Set<ZenithNode<dynamic>> _nodesReadThisCompute = <ZenithNode<dynamic>>{};
+  final Set<ZenithNode<dynamic>> _nodesReadThisCompute =
+      <ZenithNode<dynamic>>{};
   final Map<ZenithNode<dynamic>, ZenithSubscription> _subscriptions = {};
   bool _isCollectingDependencies = false;
 
@@ -46,9 +47,9 @@ class ComputedNode<T> extends ZenithNode<T>
     if (_isCollectingDependencies) {
       if (_nodesReadThisCompute.add(node)) {
         if (!_trackedSources.contains(node)) {
-           _subscriptions[node] = subscription;
+          _subscriptions[node] = subscription;
         } else {
-           subscription(); // Already tracked from previous build, cancel duplicate
+          subscription(); // Already tracked from previous build, cancel duplicate
         }
       } else {
         subscription(); // Duplicate in same build
@@ -89,6 +90,9 @@ class ComputedNode<T> extends ZenithNode<T>
         ..addAll(_nodesReadThisCompute);
 
       // Update internal value and notify downstream subscribers if changed.
+      // Stop dependency collection before notifying downstream consumers.
+      _isCollectingDependencies = false;
+      ZenithZone.currentObserver = previousObserver;
       super.set(newValue);
     } finally {
       _isComputing = false;

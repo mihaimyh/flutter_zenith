@@ -12,10 +12,18 @@ import 'zenith_node.dart';
 /// ```
 abstract class ZenithObserver {
   /// Called when a new [ZenithNode] is created in [container] with [key].
-  void onNodeCreated(ZenithContainer container, Object key, ZenithNode<dynamic> node) {}
+  void onNodeCreated(
+    ZenithContainer container,
+    Object key,
+    ZenithNode<dynamic> node,
+  ) {}
 
   /// Called when a [ZenithNode]'s value is updated.
-  void onNodeMutated(ZenithNode<dynamic> node, dynamic oldValue, dynamic newValue) {}
+  void onNodeMutated(
+    ZenithNode<dynamic> node,
+    dynamic oldValue,
+    dynamic newValue,
+  ) {}
 
   /// Called when a [ZenithNode] is disposed.
   void onNodeDisposed(ZenithNode<dynamic> node) {}
@@ -57,7 +65,11 @@ class Zenith {
 /// calls are no-ops.
 class ZenithLogObserver extends ZenithObserver {
   @override
-  void onNodeCreated(ZenithContainer container, Object key, ZenithNode<dynamic> node) {
+  void onNodeCreated(
+    ZenithContainer container,
+    Object key,
+    ZenithNode<dynamic> node,
+  ) {
     assert(() {
       Zenith.onDebugPrint?.call('[Zenith] Node created: key=$key');
       return true;
@@ -65,7 +77,11 @@ class ZenithLogObserver extends ZenithObserver {
   }
 
   @override
-  void onNodeMutated(ZenithNode<dynamic> node, dynamic oldValue, dynamic newValue) {
+  void onNodeMutated(
+    ZenithNode<dynamic> node,
+    dynamic oldValue,
+    dynamic newValue,
+  ) {
     assert(() {
       Zenith.onDebugPrint?.call('[Zenith] Node mutated: $oldValue → $newValue');
       return true;

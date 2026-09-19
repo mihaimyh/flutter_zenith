@@ -15,7 +15,9 @@ class ZenithKey<T> {
   @override
   bool operator ==(Object other) {
     return identical(this, other) ||
-        (other is ZenithKey<T> && other.name == name);
+        (other.runtimeType == runtimeType &&
+            other is ZenithKey<T> &&
+            other.name == name);
   }
 
   @override
@@ -49,10 +51,28 @@ class ZenithFamily<T, Arg> {
   const ZenithFamily(this.name);
 
   /// Resolves the specific [ZenithKey] for [argument].
-  ZenithKey<T> call(Arg argument) => ZenithKey<T>('$name#$argument');
+  ZenithKey<T> call(Arg argument) => _ZenithFamilyKey<T, Arg>(name, argument);
 
   /// Creates a registry for tracking family keys in one container scope.
   ZenithFamilyRegistry<T, Arg> registry() => ZenithFamilyRegistry<T, Arg>(this);
+}
+
+class _ZenithFamilyKey<T, Arg> extends ZenithKey<T> {
+  final String familyName;
+  final Arg argument;
+  _ZenithFamilyKey(this.familyName, this.argument)
+    : super('$familyName#$argument');
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other.runtimeType == runtimeType &&
+          other is _ZenithFamilyKey<T, Arg> &&
+          other.familyName == familyName &&
+          other.argument == argument);
+
+  @override
+  int get hashCode => Object.hash(runtimeType, familyName, argument);
 }
 
 /// Tracks the keys created for one [ZenithFamily] within a logical scope.
@@ -92,4 +112,3 @@ class ZenithFamilyRegistry<T, Arg> {
     _keys.clear();
   }
 }
-

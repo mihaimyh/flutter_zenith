@@ -26,7 +26,8 @@ mixin ZenithSafeRebuild<T extends StatefulWidget> on State<T> {
     if (!mounted) return;
 
     final phase = SchedulerBinding.instance.schedulerPhase;
-    final safeNow = phase == SchedulerPhase.idle ||
+    final safeNow =
+        phase == SchedulerPhase.idle ||
         phase == SchedulerPhase.postFrameCallbacks;
 
     if (safeNow) {

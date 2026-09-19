@@ -1,4 +1,3 @@
-
 import 'zenith_middleware.dart';
 import 'zenith_observer.dart';
 import 'zenith_zeroizable.dart';
@@ -11,6 +10,7 @@ typedef ZenithSubscription = void Function();
 
 class _SubscriberEntry {
   final WeakReference<ZenithSubscriber> subscriber;
+  bool linked = true;
   _SubscriberEntry? next;
   _SubscriberEntry? prev;
   _SubscriberEntry(this.subscriber);
@@ -66,7 +66,7 @@ class ZenithNode<T> {
 
   /// Creates a [ZenithNode] with initial [value] and optional [middleware].
   ZenithNode(this._value, {List<ZenithMiddleware<T>> middleware = const []})
-      : _middleware = List<ZenithMiddleware<T>>.unmodifiable(middleware);
+    : _middleware = List<ZenithMiddleware<T>>.unmodifiable(middleware);
 
   /// The current value held by this node.
   ///
@@ -201,21 +201,22 @@ class ZenithNode<T> {
 
     bool isCancelled = false;
     return () {
-      if (isCancelled || _isDisposed) return;
+      if (isCancelled || _isDisposed || !entry.linked) return;
       isCancelled = true;
-      
+      entry.linked = false;
+
       if (entry.prev != null) {
         entry.prev!.next = entry.next;
       } else {
         _head = entry.next;
       }
-      
+
       if (entry.next != null) {
         entry.next!.prev = entry.prev;
       } else {
         _tail = entry.prev;
       }
-      
+
       _subscriberCount--;
     };
   }
@@ -229,7 +230,8 @@ class ZenithNode<T> {
     var current = _head;
     while (current != null) {
       final next = current.next;
-      if (identical(current.subscriber.target, subscriber) || current.subscriber.target == null) {
+      if (identical(current.subscriber.target, subscriber) ||
+          current.subscriber.target == null) {
         if (current.prev != null) {
           current.prev!.next = current.next;
         } else {
@@ -240,6 +242,7 @@ class ZenithNode<T> {
         } else {
           _tail = current.prev;
         }
+        current.linked = false;
         _subscriberCount--;
       }
       current = next;
@@ -271,6 +274,7 @@ class ZenithNode<T> {
         } else {
           _tail = current.prev;
         }
+        current.linked = false;
         _subscriberCount--;
       } else {
         listeners.add(target);

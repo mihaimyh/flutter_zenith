@@ -32,14 +32,13 @@ class IpcListenerEntry {
   late final StreamSubscription<dynamic> _subscription;
 
   IpcListenerEntry(this._portName, this._tenantId, this._onInvalidate)
-      : _port = ReceivePort() {
+    : _port = ReceivePort() {
     // Clear any stale mapping then register freshly.
     IsolateNameServer.removePortNameMapping(_portName);
     IsolateNameServer.registerPortWithName(_port.sendPort, _portName);
 
     _subscription = _port.listen((message) {
-      if (message is ZenithInvalidateMessage &&
-          message.tenantId == _tenantId) {
+      if (message is ZenithInvalidateMessage && message.tenantId == _tenantId) {
         _onInvalidate(message.nodeKey);
       }
     });

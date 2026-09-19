@@ -18,17 +18,20 @@ class OrderPlacedEvent extends ZenithEvent {
 
 void main() {
   group('ZenithMediator Commands', () {
-    test('send executes registered command handler and returns result', () async {
-      final container = ZenithContainer();
-      final mediator = container.mediator;
+    test(
+      'send executes registered command handler and returns result',
+      () async {
+        final container = ZenithContainer();
+        final mediator = container.mediator;
 
-      mediator.registerCommandHandler<CalculateTotalCommand, int>(
-        (ref, cmd) => cmd.a + cmd.b,
-      );
+        mediator.registerCommandHandler<CalculateTotalCommand, int>(
+          (ref, cmd) => cmd.a + cmd.b,
+        );
 
-      final result = await mediator.send(CalculateTotalCommand(15, 25));
-      expect(result, 40);
-    });
+        final result = await mediator.send(CalculateTotalCommand(15, 25));
+        expect(result, 40);
+      },
+    );
 
     test('send throws StateError when no handler is registered', () async {
       final container = ZenithContainer();
@@ -40,95 +43,105 @@ void main() {
       );
     });
 
-    test('detects re-entrancy depth limit and throws StateError on infinite loops', () async {
-      final container = ZenithContainer();
-      final mediator = container.mediator;
+    test(
+      'detects re-entrancy depth limit and throws StateError on infinite loops',
+      () async {
+        final container = ZenithContainer();
+        final mediator = container.mediator;
 
-      mediator.registerCommandHandler<RecursiveCommand, void>(
-        (ref, cmd) async {
+        mediator.registerCommandHandler<RecursiveCommand, void>((
+          ref,
+          cmd,
+        ) async {
           await mediator.send(RecursiveCommand());
-        },
-      );
+        });
 
-      expect(
-        () => mediator.send(RecursiveCommand()),
-        throwsStateError,
-      );
-    });
+        expect(() => mediator.send(RecursiveCommand()), throwsStateError);
+      },
+    );
   });
 
   group('ZenithMediator Events', () {
-    test('publish broadcasts domain event to all registered handlers', () async {
-      final container = ZenithContainer();
-      final mediator = container.mediator;
+    test(
+      'publish broadcasts domain event to all registered handlers',
+      () async {
+        final container = ZenithContainer();
+        final mediator = container.mediator;
 
-      final eventsReceivedA = <String>[];
-      final eventsReceivedB = <String>[];
+        final eventsReceivedA = <String>[];
+        final eventsReceivedB = <String>[];
 
-      mediator.registerEventHandler<OrderPlacedEvent>((ref, event) {
-        eventsReceivedA.add(event.orderId);
-      });
+        mediator.registerEventHandler<OrderPlacedEvent>((ref, event) {
+          eventsReceivedA.add(event.orderId);
+        });
 
-      mediator.registerEventHandler<OrderPlacedEvent>((ref, event) {
-        eventsReceivedB.add(event.orderId);
-      });
+        mediator.registerEventHandler<OrderPlacedEvent>((ref, event) {
+          eventsReceivedB.add(event.orderId);
+        });
 
-      await mediator.publish(OrderPlacedEvent('order_999'));
+        await mediator.publish(OrderPlacedEvent('order_999'));
 
-      expect(eventsReceivedA, equals(['order_999']));
-      expect(eventsReceivedB, equals(['order_999']));
-    });
+        expect(eventsReceivedA, equals(['order_999']));
+        expect(eventsReceivedB, equals(['order_999']));
+      },
+    );
 
-    test('isolated error handling: failing handler does not stop remaining handlers', () async {
-      final container = ZenithContainer();
-      final mediator = container.mediator;
+    test(
+      'isolated error handling: failing handler does not stop remaining handlers',
+      () async {
+        final container = ZenithContainer();
+        final mediator = container.mediator;
 
-      final successReceived = <String>[];
+        final successReceived = <String>[];
 
-      mediator.registerEventHandler<OrderPlacedEvent>((ref, event) {
-        throw Exception('Failing handler');
-      });
+        mediator.registerEventHandler<OrderPlacedEvent>((ref, event) {
+          throw Exception('Failing handler');
+        });
 
-      mediator.registerEventHandler<OrderPlacedEvent>((ref, event) {
-        successReceived.add(event.orderId);
-      });
+        mediator.registerEventHandler<OrderPlacedEvent>((ref, event) {
+          successReceived.add(event.orderId);
+        });
 
-      await mediator.publish(OrderPlacedEvent('order_777'));
+        await mediator.publish(OrderPlacedEvent('order_777'));
 
-      // Handler 2 still received event despite Handler 1 failing
-      expect(successReceived, equals(['order_777']));
-    });
+        // Handler 2 still received event despite Handler 1 failing
+        expect(successReceived, equals(['order_777']));
+      },
+    );
   });
 
   group('ZenithMediator Pipeline Behaviors', () {
-    test('pipeline behaviors wrap command execution in registration order', () async {
-      final container = ZenithContainer();
-      final mediator = container.mediator;
+    test(
+      'pipeline behaviors wrap command execution in registration order',
+      () async {
+        final container = ZenithContainer();
+        final mediator = container.mediator;
 
-      final executionTrace = <String>[];
+        final executionTrace = <String>[];
 
-      mediator.addBehavior(_TracingBehavior('Behavior 1', executionTrace));
-      mediator.addBehavior(_TracingBehavior('Behavior 2', executionTrace));
+        mediator.addBehavior(_TracingBehavior('Behavior 1', executionTrace));
+        mediator.addBehavior(_TracingBehavior('Behavior 2', executionTrace));
 
-      mediator.registerCommandHandler<CalculateTotalCommand, int>((ref, cmd) {
-        executionTrace.add('handler');
-        return cmd.a + cmd.b;
-      });
+        mediator.registerCommandHandler<CalculateTotalCommand, int>((ref, cmd) {
+          executionTrace.add('handler');
+          return cmd.a + cmd.b;
+        });
 
-      final result = await mediator.send(CalculateTotalCommand(5, 5));
+        final result = await mediator.send(CalculateTotalCommand(5, 5));
 
-      expect(result, 10);
-      expect(
-        executionTrace,
-        equals([
-          'Behavior 1:before',
-          'Behavior 2:before',
-          'handler',
-          'Behavior 2:after',
-          'Behavior 1:after',
-        ]),
-      );
-    });
+        expect(result, 10);
+        expect(
+          executionTrace,
+          equals([
+            'Behavior 1:before',
+            'Behavior 2:before',
+            'handler',
+            'Behavior 2:after',
+            'Behavior 1:after',
+          ]),
+        );
+      },
+    );
   });
 }
 

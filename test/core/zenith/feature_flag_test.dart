@@ -10,7 +10,10 @@ void main() {
     );
 
     test('FeatureNode initializes with default value', () {
-      final node = FeatureNode(newPaymentFeature, newPaymentFeature.defaultValue);
+      final node = FeatureNode(
+        newPaymentFeature,
+        newPaymentFeature.defaultValue,
+      );
 
       expect(node.value, isFalse);
       expect(node.feature.key, 'new_payment_gateway');
@@ -46,13 +49,21 @@ void main() {
 
       // 100% rollout is always true
       expect(
-        ZenithFeature.percentageRollout(100, featureKey: feature.key, userId: 'any'),
+        ZenithFeature.percentageRollout(
+          100,
+          featureKey: feature.key,
+          userId: 'any',
+        ),
         isTrue,
       );
 
       // 0% rollout is always false
       expect(
-        ZenithFeature.percentageRollout(0, featureKey: feature.key, userId: 'any'),
+        ZenithFeature.percentageRollout(
+          0,
+          featureKey: feature.key,
+          userId: 'any',
+        ),
         isFalse,
       );
     });
@@ -61,48 +72,54 @@ void main() {
   group('ZenithFeatureBuilder UI integration', () {
     const feature = ZenithFeature('dark_mode_v2');
 
-    testWidgets('renders enabled widget when feature is true, disabled when false', (tester) async {
-      final node = FeatureNode(feature, false);
+    testWidgets(
+      'renders enabled widget when feature is true, disabled when false',
+      (tester) async {
+        final node = FeatureNode(feature, false);
 
-      await tester.pumpWidget(
-        MaterialApp(
-          home: ZenithFeatureBuilder(
-            featureNode: node,
-            enabled: (context) => const Text('New UI Enabled'),
-            disabled: (context) => const Text('Legacy UI'),
+        await tester.pumpWidget(
+          MaterialApp(
+            home: ZenithFeatureBuilder(
+              featureNode: node,
+              enabled: (context) => const Text('New UI Enabled'),
+              disabled: (context) => const Text('Legacy UI'),
+            ),
           ),
-        ),
-      );
+        );
 
-      expect(find.text('Legacy UI'), findsOneWidget);
-      expect(find.text('New UI Enabled'), findsNothing);
+        expect(find.text('Legacy UI'), findsOneWidget);
+        expect(find.text('New UI Enabled'), findsNothing);
 
-      // Toggle feature flag
-      node.set(true);
-      await tester.pump();
+        // Toggle feature flag
+        node.set(true);
+        await tester.pump();
 
-      expect(find.text('New UI Enabled'), findsOneWidget);
-      expect(find.text('Legacy UI'), findsNothing);
-    });
+        expect(find.text('New UI Enabled'), findsOneWidget);
+        expect(find.text('Legacy UI'), findsNothing);
+      },
+    );
 
-    testWidgets('renders SizedBox.shrink when disabled is omitted and feature is false', (tester) async {
-      final node = FeatureNode(feature, false);
+    testWidgets(
+      'renders SizedBox.shrink when disabled is omitted and feature is false',
+      (tester) async {
+        final node = FeatureNode(feature, false);
 
-      await tester.pumpWidget(
-        MaterialApp(
-          home: ZenithFeatureBuilder(
-            featureNode: node,
-            enabled: (context) => const Text('VIP Banner'),
+        await tester.pumpWidget(
+          MaterialApp(
+            home: ZenithFeatureBuilder(
+              featureNode: node,
+              enabled: (context) => const Text('VIP Banner'),
+            ),
           ),
-        ),
-      );
+        );
 
-      expect(find.text('VIP Banner'), findsNothing);
+        expect(find.text('VIP Banner'), findsNothing);
 
-      node.set(true);
-      await tester.pump();
+        node.set(true);
+        await tester.pump();
 
-      expect(find.text('VIP Banner'), findsOneWidget);
-    });
+        expect(find.text('VIP Banner'), findsOneWidget);
+      },
+    );
   });
 }

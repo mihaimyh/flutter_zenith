@@ -66,26 +66,29 @@ void main() {
       expect(result.errors, isEmpty);
     });
 
-    test('ZenithValidatedNode automatically updates validation state on set()', () {
-      final validatedNode = ZenithValidatedNode<SignupForm>(
-        const SignupForm(email: '', password: '', age: 0),
-        validator: validator,
-      );
+    test(
+      'ZenithValidatedNode automatically updates validation state on set()',
+      () {
+        final validatedNode = ZenithValidatedNode<SignupForm>(
+          const SignupForm(email: '', password: '', age: 0),
+          validator: validator,
+        );
 
-      expect(validatedNode.isValid, isFalse);
-      expect(validatedNode.errorsFor('email'), isNotEmpty);
+        expect(validatedNode.isValid, isFalse);
+        expect(validatedNode.errorsFor('email'), isNotEmpty);
 
-      // Update to valid model
-      validatedNode.set(
-        const SignupForm(
-          email: 'bob@example.com',
-          password: 'password123',
-          age: 30,
-        ),
-      );
+        // Update to valid model
+        validatedNode.set(
+          const SignupForm(
+            email: 'bob@example.com',
+            password: 'password123',
+            age: 30,
+          ),
+        );
 
-      expect(validatedNode.isValid, isTrue);
-      expect(validatedNode.errorsFor('email'), isEmpty);
-    });
+        expect(validatedNode.isValid, isTrue);
+        expect(validatedNode.errorsFor('email'), isEmpty);
+      },
+    );
   });
 }

@@ -29,7 +29,8 @@ class _TestStatefulCounter extends ZenithStatefulWidget {
   const _TestStatefulCounter({required this.node});
 
   @override
-  ZenithState<_TestStatefulCounter> createState() => _TestStatefulCounterState();
+  ZenithState<_TestStatefulCounter> createState() =>
+      _TestStatefulCounterState();
 }
 
 class _TestStatefulCounterState extends ZenithState<_TestStatefulCounter> {
@@ -77,7 +78,9 @@ class _TestMixinWidgetState extends State<_TestMixinWidget>
 
 void main() {
   group('ZenithStatefulWidget & ZenithState', () {
-    testWidgets('automatically rebuilds on watched node changes', (tester) async {
+    testWidgets('automatically rebuilds on watched node changes', (
+      tester,
+    ) async {
       final container = ZenithContainer();
       final node = container.getOrCreateNode<int>('count', (_) => 0);
 
@@ -100,7 +103,9 @@ void main() {
   });
 
   group('ZenithStateMixin', () {
-    testWidgets('listenNode fires without rebuild and cleans up on dispose', (tester) async {
+    testWidgets('listenNode fires without rebuild and cleans up on dispose', (
+      tester,
+    ) async {
       final container = ZenithContainer();
       final node = container.getOrCreateNode<String>('msg', (_) => 'initial');
 

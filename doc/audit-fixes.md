@@ -5,6 +5,38 @@ The September 2026 audit regressions live in `test/regressions`. The original
 Additional tests cover cancellation, reentrancy, errors, resource ownership and
 overlapping operations.
 
+## Upgrading to 0.13.0
+
+`ZenithFamily<T, Arg>` now preserves argument equality instead of converting the
+argument to a string. Keys include the family name, value type and argument type.
+Use `family(argument)` at every lookup and override. Replace manually assembled
+`ZenithKey<T>('family#argument')` keys. Arguments need stable equality and hashes.
+Base keys also compare their exact runtime type, so subtype key comparisons are
+symmetric.
+
+`ZenithAuthScope` keys its authenticated subtree by the scope object. Switching
+accounts or replacing a scope discards the old subtree's local widget state.
+Keep deliberately shared state above that boundary.
+
+Factories that throw now dispose their registered resources before rethrowing.
+Do not rely on failed initialization skipping cleanup. Register async teardown
+with `onDisposeAsync`; await container cleanup to observe its completion/errors.
+Stream bindings use this path automatically, including cancellation failures.
+
+Subscriber cancellation handles remain safe after explicit `unsubscribe`.
+Computed nodes stop dependency collection before downstream notifications, so
+listeners can read the computed value without creating a false cycle.
+Logger redaction normalizes the configured patterns as well as input keys;
+`auth_header` is masked. Redaction still applies only to recognized top-level
+properties, not arbitrary text, nested structures or exception objects.
+
+The rate limiter now uses a timestamp queue with monotonic elapsed time. It
+avoids scanning every live timestamp for every request and is unaffected by
+wall-clock adjustments. Retry attempts remain inside one admitted execution.
+
+The package remains Flutter-dependent through transitive imports. The removal
+of direct foundation imports in 0.12.0 did not make the core Dart-CLI compatible.
+
 ## Identity and authorization
 
 Object sessions require an explicit stable tenant ID:
