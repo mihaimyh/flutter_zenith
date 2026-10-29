@@ -116,4 +116,174 @@ void main() {
       expect(storage.read('tags'), 'flutter,zenith');
     });
   });
+
+  group('PersistedNode.json', () {
+    test('round-trips a map-backed value', () async {
+      final storage = InMemoryStorage();
+      final node = PersistedNode.json<_Profile>(
+        key: 'profile',
+        defaultValue: const _Profile(name: "guest", score: 0),
+        storage: storage,
+        toJson: (value) => value.toJson(),
+        fromJson: _Profile.fromJson,
+      );
+
+      node.set(const _Profile(name: 'alice', score: 42));
+      await node.flush();
+
+      final reopened = PersistedNode.json<_Profile>(
+        key: 'profile',
+        defaultValue: const _Profile(name: "guest", score: 0),
+        storage: storage,
+        toJson: (value) => value.toJson(),
+        fromJson: _Profile.fromJson,
+      );
+
+      expect(reopened.value.name, 'alice');
+      expect(reopened.value.score, 42);
+    });
+
+    test('a payload that is not a json object is a cache miss', () async {
+      final storage = InMemoryStorage();
+      await storage.write('profile', '[1,2,3]');
+
+      final node = PersistedNode.json<_Profile>(
+        key: 'profile',
+        defaultValue: const _Profile(name: "guest", score: 0),
+        storage: storage,
+        toJson: (value) => value.toJson(),
+        fromJson: _Profile.fromJson,
+      );
+
+      expect(node.value.name, 'guest');
+    });
+
+    test('a decoder that rejects the payload is a cache miss', () async {
+      final storage = InMemoryStorage();
+      await storage.write('profile', '{"name":""}');
+
+      final node = PersistedNode.json<_Profile>(
+        key: 'profile',
+        defaultValue: const _Profile(name: "guest", score: 0),
+        storage: storage,
+        toJson: (value) => value.toJson(),
+        fromJson: _Profile.fromJson,
+      );
+
+      expect(node.value.name, 'guest');
+    });
+  });
+
+  group('PersistedNode.attachStorage', () {
+    test('hydrates from a backend attached after construction', () async {
+      final cache = InMemoryStorage();
+      await cache.write('tier', 'fluent');
+
+      final node = PersistedNode.string(
+        key: 'tier',
+        defaultValue: 'explorer',
+        storage: InMemoryStorage(),
+      );
+      expect(node.value, 'explorer');
+
+      node.attachStorage(cache);
+
+      expect(node.value, 'fluent');
+    });
+
+    test('a scan decided before the attach wins over a stale cache', () async {
+      final cache = InMemoryStorage();
+      await cache.write('tier', 'fluent');
+
+      final node = PersistedNode.string(
+        key: 'tier',
+        defaultValue: 'explorer',
+        storage: InMemoryStorage(),
+      );
+      node.set('explorer');
+
+      node.attachStorage(cache);
+      await node.flush();
+
+      expect(node.value, 'explorer');
+      expect(cache.read('tier'), 'explorer');
+    });
+
+    test('writes later changes to the attached backend, not the old one', () async {
+      final old = InMemoryStorage();
+      final cache = InMemoryStorage();
+      final node = PersistedNode.string(
+        key: 'tier',
+        defaultValue: 'explorer',
+        storage: old,
+      );
+
+      node.attachStorage(cache);
+      node.set('fluent');
+      await node.flush();
+
+      expect(cache.read('tier'), 'fluent');
+      expect(old.read('tier'), isNull);
+    });
+
+    test('a corrupt payload is ignored and the live value is written', () async {
+      final cache = InMemoryStorage();
+      await cache.write('tier', '\u0000not-valid');
+
+      final node = PersistedNode<String>(
+        key: 'tier',
+        defaultValue: 'explorer',
+        storage: InMemoryStorage(),
+        toStorage: (value) => value,
+        fromStorage: (raw) {
+          if (raw.contains('not-valid')) throw const FormatException('bad');
+          return raw;
+        },
+      );
+
+      node.attachStorage(cache);
+      await node.flush();
+
+      expect(node.value, 'explorer');
+      expect(cache.read('tier'), 'explorer');
+    });
+
+    test('attaching the same backend twice is a no-op', () async {
+      final cache = InMemoryStorage();
+      await cache.write('tier', 'fluent');
+
+      final node = PersistedNode.string(
+        key: 'tier',
+        defaultValue: 'explorer',
+        storage: InMemoryStorage(),
+      );
+
+      node.attachStorage(cache);
+      node.set('explorer');
+      node.attachStorage(cache);
+
+      expect(node.value, 'explorer');
+    });
+  });
+}
+
+class _Profile {
+  const _Profile({required this.name, required this.score});
+
+  final String name;
+  final int score;
+
+  Map<String, dynamic> toJson() => {
+    'name': name,
+    'score': score,
+  };
+
+  factory _Profile.fromJson(Map<String, dynamic> json) {
+    final name = json['name'];
+    final score = json['score'];
+    if (name is! String || name.isEmpty || score is! int) {
+      throw const FormatException('invalid profile');
+    }
+    return _Profile(name: name, score: score);
+  }
 }
