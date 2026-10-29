@@ -1,3 +1,18 @@
+## 0.14.0
+
+### Features
+
+* `PersistedNode.attachStorage(storage)` swaps the backend at runtime, for nodes whose key is only known after startup (an account id from auth). A value already `set` in the process wins over the newly attached backend and is written there, so the decision is durable; a node that never decided adopts the cached value.
+* `ScopedStorage` is a synchronous per-scope view over a shared `ZenithStorage`, keyed as `scope/{scope}/{key}`. `ZenithPartitionedStorage` covers the same ground for async drivers, but `PersistedNode` reads synchronously.
+* `PersistedNode.json<T>` stores a value as a JSON object through `toJson`/`fromJson`. A payload that is not a JSON object, or one the decoder rejects, is a cache miss instead of an exception on launch.
+* `package:flutter_zenith/persistence_shared_preferences.dart` adds `SharedPreferencesStorage`, a `ZenithStorage` over `SharedPreferences`, with `load()` for the one-time asynchronous initialization. `clear()` removes only the keys that instance wrote, so it cannot wipe the host app's other preferences.
+* `PersistedNode` exposes `defaultValue`, and a corrupt entry is a cache miss for every constructor, not only for the JSON helper.
+
+### Notes
+
+* `PersistedNode.storage` is now a getter. Reads are source compatible.
+* Adds `shared_preferences` to the package dependencies for the new adapter entrypoint. The core `flutter_zenith.dart` import does not expose it.
+
 ## 0.13.1
 
 ### Fixes

@@ -96,7 +96,7 @@ Create containers outside `build`. A `ZenithScope` disposes the container it own
 | Concurrency | `runAsyncGuarded`, `ConcurrencyStrategy`, `runInIsolate` | Concurrent, droppable or restartable results; explicit isolate offload. |
 | Scope generations | `ZenithScopeGuard`, `ZenithScopeToken` | Capture and invalidate tokens for application work across scope changes. |
 | Streams | `watchStream`, node `watch` | Stream data/errors become async state; cancellation joins asynchronous cleanup. |
-| Persistence | `PersistedNode`, `ZenithStorage`, `InMemoryStorage` | Synchronous hydration, ordered async writes, `flush` and `persistenceError`. |
+| Persistence | `PersistedNode`, `ZenithStorage`, `InMemoryStorage`, `ScopedStorage` | Synchronous hydration, ordered async writes, attachable backend, JSON helper, per-scope keys, `flush` and `persistenceError`. |
 | Middleware | `ZenithMiddleware` | Transform or cancel writes and observe accepted writes. |
 | Core auth models | `AuthState` and its variants | Data model for unauthenticated, authenticating, authenticated and error states. |
 | Configuration | `ZenithConfigNode` | Decode map payloads into typed configuration. |
@@ -119,6 +119,7 @@ Create containers outside `build`. A `ZenithScope` disposes the container it own
 | Identity transitions | `ZenithIdentityCoordinator`, `ZenithAuthState`, `ZenithMigrationException` | Anonymous sessions, account upgrades, sign-in/out and stale-migration protection. |
 | Lock and revocation | `AuthLocked`, `lockSession`, `unlockSession`, `RevocationReason` | Lock-screen state and application-supplied remote revocation events. |
 | Tenant storage | `StorageDriver`, `InMemoryStorageDriver`, `ZenithPartitionedStorage` | Asynchronous storage with independently encoded tenant/key namespaces. |
+| `SharedPreferences` | `SharedPreferencesStorage` | `ZenithStorage` over `SharedPreferences`, in the separate `package:flutter_zenith/persistence_shared_preferences.dart` entrypoint. |
 | Outbox | `ZenithOutboxEngine`, `OutboxMutation` | In-memory tenant-filtered dispatch, stable and caller-supplied IDs, deduplicated rehydration, restored retry/backoff state, dead letters and per-tenant clearing. |
 | Policies | `ZenithPolicy`, `PolicyRef`, `ZenithRequirement`, `UserSecurityContext` | Custom predicates plus authentication, entitlement, role and bandwidth requirements. |
 | Authorization | `ZenithAuthorizationService`, `AuthorizationResult`, `ZenithRouteGuard` | Fail-closed policy evaluation and redirect decisions. |
@@ -215,7 +216,26 @@ theme.dispose();
 
 Supply a `ZenithStorage` implementation for real persistence. Its read method is synchronous, so asynchronous backends need preloading/caching or a separate hydration flow. Accepted writes are serialized across nodes sharing the same backend object and key. `flush()` observes the node's latest accepted write; `persistenceError` exposes its failure. Disposal does not cancel accepted writes.
 
-Identity `StorageDriver` is a separate, fully asynchronous interface. `ZenithPartitionedStorage` is not directly interchangeable with `ZenithStorage`.
+Backends are attachable, which is what a node needs when the key is only known after startup (an account id from auth):
+
+```dart
+// Placeholder until the account is known.
+final profile = PersistedNode.json<Profile>(
+  key: 'profile',
+  defaultValue: const Profile.guest(),
+  storage: InMemoryStorage(),
+  toJson: (value) => value.toJson(),
+  fromJson: Profile.fromJson,
+);
+
+// Later, once auth answers: adopt the cached value unless this process already
+// decided one, and write to the real backend from then on.
+profile.attachStorage(ScopedStorage(await SharedPreferencesStorage.load(), scope: userId));
+```
+
+`attachStorage` adopts the new backend's value only when nothing has been `set` yet, so a cache can never overwrite a fresher in-process answer. A payload that is not a JSON object, or one the decoder rejects, is a cache miss instead of an exception. `ScopedStorage` namespaces a synchronous backend per account; `SharedPreferencesStorage` (import `package:flutter_zenith/persistence_shared_preferences.dart`) wraps `SharedPreferences` and clears only its own keys.
+
+Identity `StorageDriver` is a separate, fully asynchronous interface. `ZenithPartitionedStorage` is not directly interchangeable with `ZenithStorage`; `ScopedStorage` is the synchronous counterpart.
 
 ```dart
 final outbox = identity.ZenithOutboxEngine()..setActiveTenant('alice');
