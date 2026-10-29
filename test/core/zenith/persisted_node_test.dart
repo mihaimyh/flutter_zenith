@@ -248,6 +248,40 @@ void main() {
       expect(cache.read('tier'), 'explorer');
     });
 
+    test('adopting the stored value wins even after a decision, for a new scope', () async {
+      // Account switch: the cache belongs to the next account, so "fresher in this
+      // process" does not apply to it.
+      final nextAccount = InMemoryStorage();
+      await nextAccount.write('tier', 'fluent');
+
+      final node = PersistedNode.string(
+        key: 'tier',
+        defaultValue: 'explorer',
+        storage: InMemoryStorage(),
+      );
+      node.set('explorer');
+
+      node.attachStorage(nextAccount, adoptStoredValue: true);
+
+      expect(node.value, 'fluent');
+    });
+
+    test('adopting an empty backend keeps the decided value', () async {
+      final nextAccount = InMemoryStorage();
+      final node = PersistedNode.string(
+        key: 'tier',
+        defaultValue: 'explorer',
+        storage: InMemoryStorage(),
+      );
+      node.set('fluent');
+
+      node.attachStorage(nextAccount, adoptStoredValue: true);
+      await node.flush();
+
+      expect(node.value, 'fluent');
+      expect(nextAccount.read('tier'), 'fluent');
+    });
+
     test('attaching the same backend twice is a no-op', () async {
       final cache = InMemoryStorage();
       await cache.write('tier', 'fluent');

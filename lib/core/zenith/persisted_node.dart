@@ -184,12 +184,19 @@ class PersistedNode<T> extends ZenithNode<T> {
   /// * otherwise keep the current value and write it to the new backend, so the
   ///   decision is durable.
   ///
+  /// Set [adoptStoredValue] when the backend belongs to a different scope, such as
+  /// the next account after a switch. There, "decided in this process" says nothing
+  /// about that account, so the stored value wins.
+  ///
   /// Writes already accepted by the previous backend are not cancelled.
-  void attachStorage(ZenithStorage storage) {
+  void attachStorage(
+    ZenithStorage storage, {
+    bool adoptStoredValue = false,
+  }) {
     if (identical(storage, _storage)) return;
     _storage = storage;
 
-    if (!_decided) {
+    if (adoptStoredValue || !_decided) {
       final cached = _read(key, storage, fromStorage);
       if (cached != null) {
         set(cached);
