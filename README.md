@@ -230,7 +230,10 @@ final profile = PersistedNode.json<Profile>(
 
 // Later, once auth answers: adopt the cached value unless this process already
 // decided one, and write to the real backend from then on.
-profile.attachStorage(ScopedStorage(await SharedPreferencesStorage.load(), scope: userId));
+profile.attachStorage(
+  ScopedStorage(await SharedPreferencesStorage.load(), scope: userId),
+  adoptStoredValue: true, // the cache belongs to this account
+);
 ```
 
 `attachStorage` adopts the new backend's value only when nothing has been `set` yet, so a cache can never overwrite a fresher in-process answer. A payload that is not a JSON object, or one the decoder rejects, is a cache miss instead of an exception. `ScopedStorage` namespaces a synchronous backend per account; `SharedPreferencesStorage` (import `package:flutter_zenith/persistence_shared_preferences.dart`) wraps `SharedPreferences` and clears only its own keys.

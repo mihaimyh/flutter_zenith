@@ -1,3 +1,10 @@
+## 0.14.1
+
+### Fixes
+
+* `PersistedNode.attachStorage(storage, adoptStoredValue: true)` takes the newly attached backend's value even when the process already set one. Without it, an account switch could not hydrate the next account's cache — the value written on sign-out counted as a decision — and the next account's stored value was overwritten with it.
+* The default remains "keep what this process decided and write it to the new backend", which is what a same-scope backend migration needs.
+
 ## 0.14.0
 
 ### Features
