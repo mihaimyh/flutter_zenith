@@ -44,3 +44,57 @@ class InMemoryStorage implements ZenithStorage {
     _map.clear();
   }
 }
+/// A synchronous, per-scope view over a shared [ZenithStorage].
+///
+/// [ZenithPartitionedStorage] (in `zenith_identity`) offers the same isolation for
+/// async backends, but a [PersistedNode] reads synchronously at construction, so it
+/// needs a synchronous view: one backend on the device, one namespace per account.
+///
+/// ```dart
+/// final storage = ScopedStorage(prefs, scope: userId);
+/// final tier = PersistedNode.string(key: "tier", defaultValue: "explorer", storage: storage);
+/// ```
+class ScopedStorage implements ZenithStorage {
+  /// Wraps [inner], namespacing every key under [scope].
+  ScopedStorage(this._inner, {required this.scope});
+
+  final ZenithStorage _inner;
+
+  /// The account, tenant or session this view belongs to.
+  final String scope;
+
+  /// Keys read or written through this view. [clear] is limited to them, because
+  /// [ZenithStorage] cannot enumerate and clearing the backend would wipe every
+  /// other scope.
+  final Set<String> _touched = <String>{};
+
+  String _namespace(String key) =>
+      'scope/${Uri.encodeComponent(scope)}/${Uri.encodeComponent(key)}';
+
+  @override
+  String? read(String key) {
+    _touched.add(key);
+    return _inner.read(_namespace(key));
+  }
+
+  @override
+  Future<void> write(String key, String value) {
+    _touched.add(key);
+    return _inner.write(_namespace(key), value);
+  }
+
+  @override
+  Future<void> delete(String key) {
+    _touched.remove(key);
+    return _inner.delete(_namespace(key));
+  }
+
+  @override
+  Future<void> clear() async {
+    final keys = _touched.toList(growable: false);
+    _touched.clear();
+    for (final key in keys) {
+      await _inner.delete(_namespace(key));
+    }
+  }
+}
