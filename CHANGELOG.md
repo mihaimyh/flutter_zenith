@@ -1,3 +1,17 @@
+## 0.13.1
+
+### Fixes
+
+* `ZenithScope` gained `disposeContainer` (default `true`). Shared containers — app-wide containers mounted in nested scopes, test fixtures, second scopes over the same object — can now opt out of disposal instead of dying with the scope and failing later with `Cannot create node in disposed ZenithContainer`.
+* `ZenithOutboxEngine.enqueue` accepts a caller-supplied `id` and returns `false` for an id that is already pending or dead-lettered. Durable outboxes that rehydrate persisted rows no longer enqueue a second copy of the same logical mutation and dispatch it twice.
+* `ZenithOutboxEngine.enqueue` restores `retryCount`, `lastError`, `lastAttemptedAt` and `nextRetryAfter`, so persisted retry state survives a restart. A mutation restored with `retryCount >= maxRetries` is dead-lettered immediately, and a restored `nextRetryAfter` suppresses the post-restart retry burst.
+* Add `ZenithOutboxEngine.remove(id)` and `clearTenant(tenantId)` so sign-out can drop in-memory mutations that are already persisted. Mutations removed mid-flush are no longer dispatched.
+* The pending queue is now keyed by mutation id instead of object identity, which makes dedupe and removal constant time. `pendingCount`, `deadLetterQueue`, ordering and backoff behaviour are unchanged.
+
+### Verification
+
+* Add regressions for rehydration dedupe, per-tenant clearing, mid-flush removal, restored retry/backoff state, immediate dead-lettering of exhausted mutations and all three `ZenithScope` ownership modes.
+
 ## 0.13.0
 
 ### Migration

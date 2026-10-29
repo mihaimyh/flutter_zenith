@@ -18,7 +18,7 @@ Or add the dependency explicitly:
 
 ```yaml
 dependencies:
-  flutter_zenith: ^0.13.0
+  flutter_zenith: ^0.13.1
 ```
 
 Use the core entry point for nodes, containers, widgets and application utilities:
@@ -37,7 +37,7 @@ See [API reference](https://pub.dev/documentation/flutter_zenith/latest/), the [
 
 ## Quick start
 
-This complete app creates a typed counter in a container. `ZenithBuilder` tracks the node read inside its builder and rebuilds when that value changes. `ZenithScope` owns the container and disposes it when removed.
+This complete app creates a typed counter in a container. `ZenithBuilder` tracks the node read inside its builder and rebuilds when that value changes. `ZenithScope` owns the container and disposes it when removed or replaced.
 
 ```dart
 import 'package:flutter/material.dart';
@@ -74,7 +74,7 @@ class CounterScreen extends StatelessWidget {
 }
 ```
 
-Create containers outside `build`. A `ZenithScope` also disposes the old container when replaced with a different one. Do not place the same owned container in several independent `ZenithScope` widgets.
+Create containers outside `build`. A `ZenithScope` disposes the container it owns when it is removed or replaced with a different one. Wrapping a shared or app-wide container (a nested scope, a test helper, a second `ZenithScope` with the same object) requires `disposeContainer: false`; otherwise the container dies with the scope and later lookups throw `Cannot create node in disposed ZenithContainer`.
 
 ## Feature catalog
 
@@ -119,7 +119,7 @@ Create containers outside `build`. A `ZenithScope` also disposes the old contain
 | Identity transitions | `ZenithIdentityCoordinator`, `ZenithAuthState`, `ZenithMigrationException` | Anonymous sessions, account upgrades, sign-in/out and stale-migration protection. |
 | Lock and revocation | `AuthLocked`, `lockSession`, `unlockSession`, `RevocationReason` | Lock-screen state and application-supplied remote revocation events. |
 | Tenant storage | `StorageDriver`, `InMemoryStorageDriver`, `ZenithPartitionedStorage` | Asynchronous storage with independently encoded tenant/key namespaces. |
-| Outbox | `ZenithOutboxEngine`, `OutboxMutation` | In-memory tenant-filtered dispatch, stable IDs, retry/backoff and dead letters. |
+| Outbox | `ZenithOutboxEngine`, `OutboxMutation` | In-memory tenant-filtered dispatch, stable and caller-supplied IDs, deduplicated rehydration, restored retry/backoff state, dead letters and per-tenant clearing. |
 | Policies | `ZenithPolicy`, `PolicyRef`, `ZenithRequirement`, `UserSecurityContext` | Custom predicates plus authentication, entitlement, role and bandwidth requirements. |
 | Authorization | `ZenithAuthorizationService`, `AuthorizationResult`, `ZenithRouteGuard` | Fail-closed policy evaluation and redirect decisions. |
 | Conditional UI | `ZenithAuthorizeView`, `.hidden`, `.locked` | Authorized, denied and pending views; reactive reads through `PolicyRef.watch`. |
@@ -220,6 +220,7 @@ Identity `StorageDriver` is a separate, fully asynchronous interface. `ZenithPar
 ```dart
 final outbox = identity.ZenithOutboxEngine()..setActiveTenant('alice');
 outbox.enqueue(
+  id: 'draft-42',
   tenantId: 'alice',
   action: 'saveDraft',
   payload: {'title': 'Travel'},
@@ -227,9 +228,12 @@ outbox.enqueue(
 // Supply a dispatcher bound to Alice's credentials:
 // await outbox.flush((mutation) => api.send(mutation));
 outbox.setActiveTenant(null);
+outbox.clearTenant('alice'); // drop in-memory work already persisted elsewhere
 ```
 
 The outbox is in-memory and is not a durable transaction log. Persist it outside this component if mutations must survive process restarts. Activate/deactivate it explicitly on identity transitions. A tenant change stops later dispatches but cannot recall an in-flight request. Pass `mutation.id` to a backend with idempotency support when retrying ambiguous failures. Concurrent flush callers share a completion; newly enqueued work waits for the next pass. Inactive tenants' work remains queued.
+
+Wrap the outbox with your own store when mutations must survive restarts. `enqueue` accepts a caller-supplied `id` and returns `false` for an id that is already pending or dead-lettered, so rehydrated rows never double-dispatch. It also restores `retryCount`, `lastError`, `lastAttemptedAt` and `nextRetryAfter`, and a mutation restored with `retryCount >= maxRetries` goes straight to the dead-letter queue. Use `remove(id)` for a single entry and `clearTenant(tenantId)` on sign-out to drop pending work that is already persisted; `deadLetterQueue` is kept for inspection.
 
 ## Identity, scopes and authorization
 

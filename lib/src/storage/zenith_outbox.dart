@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:collection';
 import 'dart:math' as math;
 
 /// A single queued offline mutation waiting to be dispatched.
@@ -82,7 +81,7 @@ class OutboxMutation {
 /// await outbox.flush(dispatch); // user_a's mutation is NOT flushed
 /// ```
 class ZenithOutboxEngine {
-  final _queue = LinkedHashSet<OutboxMutation>.identity();
+  final _queue = <String, OutboxMutation>{};
   Future<void>? _flushFuture;
   int _generation = 0;
   final List<OutboxMutation> _deadLetterQueue = [];
@@ -93,20 +92,75 @@ class ZenithOutboxEngine {
       List.unmodifiable(_deadLetterQueue);
 
   /// Enqueues a mutation for [tenantId].
-  void enqueue({
+  ///
+  /// Pass [id] to make enqueueing idempotent — re-enqueueing a mutation whose
+  /// id is already pending (or already dead-lettered) is ignored. Without an
+  /// [id] every call creates a new mutation with a random identity.
+  ///
+  /// [retryCount], [lastError], [lastAttemptedAt] and [nextRetryAfter] restore
+  /// persisted retry state, so a durable outbox resumed after a restart keeps
+  /// its backoff and dead-letter accounting. A restored mutation whose
+  /// [retryCount] already reached [maxRetries] is dead-lettered immediately
+  /// instead of being dispatched again.
+  ///
+  /// Returns `true` when the mutation was enqueued, `false` when it was
+  /// skipped as a duplicate.
+  bool enqueue({
+    String? id,
     required String tenantId,
     required String action,
     required Map<String, dynamic> payload,
     int maxRetries = 3,
+    int retryCount = 0,
+    Object? lastError,
+    DateTime? lastAttemptedAt,
+    DateTime? nextRetryAfter,
   }) {
-    _queue.add(
-      OutboxMutation(
-        tenantId: tenantId,
-        action: action,
-        payload: payload,
-        maxRetries: maxRetries,
-      ),
+    final identity = id ?? OutboxMutation._newId();
+    if (_queue.containsKey(identity) ||
+        _deadLetterQueue.any((m) => m.id == identity)) {
+      return false;
+    }
+
+    final mutation = OutboxMutation(
+      id: identity,
+      tenantId: tenantId,
+      action: action,
+      payload: payload,
+      maxRetries: maxRetries,
+      retryCount: retryCount,
+      lastError: lastError,
+      lastAttemptedAt: lastAttemptedAt,
+      nextRetryAfter: nextRetryAfter,
     );
+    if (mutation.retryCount >= mutation.maxRetries) {
+      _deadLetterQueue.add(mutation);
+    } else {
+      _queue[identity] = mutation;
+    }
+    return true;
+  }
+
+  /// Removes the mutation with [id] from the pending queue.
+  ///
+  /// Returns `true` when an entry was removed. Dead-lettered mutations are
+  /// left untouched.
+  bool remove(String id) => _queue.remove(id) != null;
+
+  /// Drops every pending mutation owned by [tenantId] and returns how many
+  /// were removed. Dead-lettered mutations are kept for inspection.
+  ///
+  /// Call this on sign-out when the mutations are already persisted elsewhere,
+  /// so a later rehydration does not duplicate them.
+  int clearTenant(String tenantId) {
+    final ids = _queue.entries
+        .where((entry) => entry.value.tenantId == tenantId)
+        .map((entry) => entry.key)
+        .toList(growable: false);
+    for (final id in ids) {
+      _queue.remove(id);
+    }
+    return ids.length;
   }
 
   /// Sets the active tenant, or null on sign-out. Invalidates any pending pass.
@@ -120,7 +174,7 @@ class ZenithOutboxEngine {
 
   /// Returns the number of pending (unflushed) mutations for [tenantId].
   int pendingCount(String tenantId) =>
-      _queue.where((m) => m.tenantId == tenantId).length;
+      _queue.values.where((m) => m.tenantId == tenantId).length;
 
   /// Returns the number of dead-letter mutations for [tenantId].
   int deadLetterCount(String tenantId) =>
@@ -186,17 +240,20 @@ class ZenithOutboxEngine {
     if (active == null) return;
 
     final now = DateTime.now();
-    final toFlush = _queue.where((m) => m.tenantId == active).toList();
+    final toFlush = _queue.values.where((m) => m.tenantId == active).toList();
 
     for (final mutation in toFlush) {
       if (generation != _generation) break;
+      // A mutation removed by [remove] / [clearTenant] during the pass is
+      // dropped instead of being dispatched.
+      if (!_queue.containsKey(mutation.id)) continue;
       if (!ignoreBackoff && !mutation.isEligibleForRetry(now)) {
         continue;
       }
 
       try {
         await dispatcher(mutation);
-        _queue.remove(mutation);
+        _queue.remove(mutation.id);
       } catch (e) {
         mutation.retryCount++;
         mutation.lastError = e;
@@ -215,7 +272,7 @@ class ZenithOutboxEngine {
         );
 
         if (mutation.retryCount >= mutation.maxRetries) {
-          _queue.remove(mutation);
+          _queue.remove(mutation.id);
           _deadLetterQueue.add(mutation);
         }
         try {

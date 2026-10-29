@@ -7,11 +7,28 @@ import 'zenith_safe_rebuild.dart';
 
 /// An [InheritedWidget] wrapper that binds a [ZenithContainer] to a subtree
 /// of the widget tree.
+///
+/// By default the scope owns its container and disposes it when the scope is
+/// removed or replaced with a different container. Pass
+/// `disposeContainer: false` when the container is owned elsewhere (an app-wide
+/// container, a test fixture, or a nested scope sharing its parent's container).
 class ZenithScope extends StatefulWidget {
   final ZenithContainer container;
   final Widget child;
 
-  const ZenithScope({super.key, required this.container, required this.child});
+  /// Whether this scope disposes [container] when it is removed or replaced.
+  ///
+  /// Keep the default `true` for containers created for this scope only. Set
+  /// it to `false` for shared containers; otherwise the next node lookup after
+  /// teardown throws `Cannot create node in disposed ZenithContainer`.
+  final bool disposeContainer;
+
+  const ZenithScope({
+    super.key,
+    required this.container,
+    required this.child,
+    this.disposeContainer = true,
+  });
 
   static ZenithContainer of(BuildContext context) {
     final inherited = context
@@ -37,14 +54,17 @@ class _ZenithScopeState extends State<ZenithScope> {
   void didUpdateWidget(covariant ZenithScope oldWidget) {
     super.didUpdateWidget(oldWidget);
 
-    if (!identical(oldWidget.container, widget.container)) {
+    if (!identical(oldWidget.container, widget.container) &&
+        oldWidget.disposeContainer) {
       oldWidget.container.dispose();
     }
   }
 
   @override
   void dispose() {
-    widget.container.dispose();
+    if (widget.disposeContainer) {
+      widget.container.dispose();
+    }
     super.dispose();
   }
 
