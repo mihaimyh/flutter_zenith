@@ -1,3 +1,12 @@
+## 0.15.0
+
+### Breaking
+
+* `package:flutter_zenith/persistence_shared_preferences.dart` is gone. `SharedPreferencesStorage` now lives in the [`flutter_zenith_shared_preferences`](https://pub.dev/packages/flutter_zenith_shared_preferences) package, so the engine no longer installs a platform plugin for everyone who uses it.
+* `shared_preferences` is no longer a dependency of this package.
+
+`ScopedStorage` stays here: it is plugin-free and works over any `ZenithStorage`.
+
 ## 0.14.1
 
 ### Fixes

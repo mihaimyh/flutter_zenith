@@ -236,7 +236,7 @@ profile.attachStorage(
 );
 ```
 
-`attachStorage` adopts the new backend's value only when nothing has been `set` yet, so a cache can never overwrite a fresher in-process answer. A payload that is not a JSON object, or one the decoder rejects, is a cache miss instead of an exception. `ScopedStorage` namespaces a synchronous backend per account; `SharedPreferencesStorage` (import `package:flutter_zenith/persistence_shared_preferences.dart`) wraps `SharedPreferences` and clears only its own keys.
+`attachStorage` adopts the new backend's value only when nothing has been `set` yet, so a cache can never overwrite a fresher in-process answer. A payload that is not a JSON object, or one the decoder rejects, is a cache miss instead of an exception. `ScopedStorage` namespaces a synchronous backend per account. `SharedPreferencesStorage`, the `SharedPreferences` adapter, ships separately in [`flutter_zenith_shared_preferences`](https://pub.dev/packages/flutter_zenith_shared_preferences) so this package does not depend on a platform plugin.
 
 Identity `StorageDriver` is a separate, fully asynchronous interface. `ZenithPartitionedStorage` is not directly interchangeable with `ZenithStorage`; `ScopedStorage` is the synchronous counterpart.
 
